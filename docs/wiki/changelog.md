@@ -6,6 +6,7 @@ Frühere Einträge nennen die damaligen Dateipfade; die aktuelle Struktur steht 
 
 ## 2026-09-29
 
+- Im Adminformular das Disketten-Symbol vom Speichern-Button entfernt und die Rückmeldung unter den Button gesetzt; „Änderungen gespeichert.“ verschwindet nach drei Sekunden oder bei erneuter Eingabe, ohne neue Hinweise oder Fehler auszublenden (`public/admin.html`, `public/js/admin.js`, [[features/administration]], [[design/erscheinungsbild]]).
 - Die zusätzliche Karte um „Passwort wiederholen“ entfernt; beide Passwortfelder verwenden wieder dieselbe Formular-Gestaltung, während die Passwortstärke ihre eigene Karte behält (`public/index.html`, `public/css/style.css`, [[design/erscheinungsbild]]).
 - Die Passwortstärke in eine eigene dunkle Karte unterhalb der separaten Karte für „Passwort wiederholen“ gesetzt und die Abstände angepasst (`public/index.html`, `public/css/style.css`, [[design/erscheinungsbild]]).
 - Im Registrierungsmodus „Passwort wiederholen“ und Stärkeanzeige in einer Karte zusammengeführt, die Stärke unter das Wiederholungsfeld gesetzt und den anfänglichen Aufforderungstext entfernt; die Rückmeldung erscheint erst bei Eingabe (`public/index.html`, `public/css/style.css`, `public/js/app.js`, [[design/erscheinungsbild]], [[features/anmeldung-und-teilnahme]]).

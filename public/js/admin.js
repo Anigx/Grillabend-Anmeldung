@@ -14,10 +14,16 @@ document.addEventListener('DOMContentLoaded', () => {
     let marker = null;
     let selectedPin = null;
     let lastSearchAt = 0;
+    let saveMessageTimeout = null;
 
     function message(text, type = 'error') {
+        clearTimeout(saveMessageTimeout);
+        saveMessageTimeout = null;
         el('adminMessage').textContent = text;
         el('adminMessage').className = text ? `message ${type}` : 'hidden message';
+        if (text === 'Änderungen gespeichert.' && type === 'success') {
+            saveMessageTimeout = setTimeout(() => message(''), 3000);
+        }
     }
 
     const columnHelp = {
@@ -348,6 +354,10 @@ document.addEventListener('DOMContentLoaded', () => {
     el('clearPinBtn').addEventListener('click', () => {
         setPin(null, null, true);
         message('Pin und Link entfernt. Bitte Änderungen speichern.', 'success');
+    });
+
+    el('adminForm').addEventListener('input', () => {
+        if (el('adminMessage').textContent === 'Änderungen gespeichert.') message('');
     });
 
     el('adminForm').addEventListener('submit', async event => {
