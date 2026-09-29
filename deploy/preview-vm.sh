@@ -54,7 +54,7 @@ case "${1:-}" in
     [[ "$url" =~ ^https://[a-z0-9-]+\.trycloudflare\.com$ ]] || exit 1
     host="${url#https://}"
     ready=''
-    for attempt in $(seq 1 30); do
+    for attempt in $(seq 1 10); do
       if curl --fail --silent --show-error --max-time 10 \
         --header "Host: $host" http://127.0.0.1:8080/ --output /dev/null; then
         ready=1
@@ -79,6 +79,7 @@ case "${1:-}" in
         grillabend:vm-test node -e 'require("node:http").createServer((req, res) => res.end("ok")).listen(621, "127.0.0.1")' || true
       sleep 3
       docker inspect --format 'HTTP-Kontrolle: {{json .State}} | NetworkMode: {{.HostConfig.NetworkMode}}' preview-http-control || true
+      docker logs preview-http-control || true
       curl --silent --show-error --max-time 3 http://127.0.0.1:621/ || true
       docker rm --force preview-http-control > /dev/null 2>&1 || true
       exit 1
