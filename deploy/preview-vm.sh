@@ -70,21 +70,12 @@ case "${1:-}" in
       docker inspect --format 'Container-Endzustand: {{json .State}} | RestartCount: {{.RestartCount}} | NetworkMode: {{.HostConfig.NetworkMode}}' "$container" || true
       docker events --since 3m --until "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
         --filter "container=$container" --format '{{json .}}' || true
-      echo 'Host-Listener auf Port 621:' >&2
-      sudo ss -ltnp '( sport = :621 )' || true
+      echo 'Host-Listener auf Port 1621:' >&2
+      sudo ss -ltnp '( sport = :1621 )' || true
       sudo tail -n 30 /var/log/nginx/error.log || true
-      echo 'Kontrollversuch mit einem einfachen HTTP-Server im selben Image:' >&2
-      docker compose stop grillabend || true
-      docker run --detach --name preview-http-control --network host \
-        grillabend:vm-test node -e 'require("node:http").createServer((req, res) => res.end("ok")).listen(621, "127.0.0.1")' || true
-      sleep 3
-      docker inspect --format 'HTTP-Kontrolle: {{json .State}} | NetworkMode: {{.HostConfig.NetworkMode}}' preview-http-control || true
-      docker logs preview-http-control || true
-      curl --silent --show-error --max-time 3 http://127.0.0.1:621/ || true
-      docker rm --force preview-http-control > /dev/null 2>&1 || true
       exit 1
     fi
-    [[ "$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:621/api/session)" == 426 ]]
+    [[ "$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:1621/api/session)" == 426 ]]
 
     for attempt in $(seq 1 30); do
       if curl --fail --silent --show-error --max-time 15 "$url/" \

@@ -19,7 +19,7 @@ server {
     add_header X-Frame-Options "DENY" always;
 
     location / {
-        proxy_pass http://127.0.0.1:621;
+        proxy_pass http://127.0.0.1:1621;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Forwarded-Proto https;

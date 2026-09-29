@@ -7,7 +7,7 @@ services:
       - .env
     environment:
       NODE_ENV: production
-      PORT: "621"
+      PORT: "1621"
       DATA_DIR: /app/data
       APP_ORIGIN: ${APP_ORIGIN:?APP_ORIGIN in .env als HTTPS-Origin eintragen}
     volumes:
