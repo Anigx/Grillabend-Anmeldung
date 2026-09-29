@@ -25,18 +25,16 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Produktionsimage aus diesem Commit bauen
         run: docker build -t grillabend:vm-test .
-      - name: Container und temporären HTTPS-Tunnel starten
-        id: site
-        run: bash deploy/preview-vm.sh start
-      - name: Öffentlichen Zugriff und Registrierung prüfen
-        run: bash deploy/preview-vm.sh check '${{ steps.site.outputs.url }}'
-      - name: Geprüften Link als GitHub-Deployment bereitstellen
+      - name: Testseite starten, prüfen und erreichbar halten
         env:
           GH_TOKEN: ${{ github.token }}
-          PREVIEW_URL: ${{ steps.site.outputs.url }}
           PREVIEW_MINUTES: ${{ inputs.minuten }}
         run: |
           set -euo pipefail
+          trap 'bash deploy/preview-vm.sh cleanup' EXIT
+          bash deploy/preview-vm.sh start
+          PREVIEW_URL=$(cat "$RUNNER_TEMP/preview-url")
+          bash deploy/preview-vm.sh check "$PREVIEW_URL"
           id=$(jq -nc --arg ref "$GITHUB_SHA" \
             '{ref:$ref,environment:"vm-preview",auto_merge:false,required_contexts:[],transient_environment:true,production_environment:false}' \
             | gh api "repos/$GITHUB_REPOSITORY/deployments" --method POST --input - --jq '.id')
@@ -51,10 +49,4 @@ jobs:
             echo "Die URL wird danach ungültig; über 'Run workflow' lässt sich eine neue starten."
           } >> "$GITHUB_STEP_SUMMARY"
           echo "Testseite: $PREVIEW_URL"
-      - name: Testseite erreichbar halten
-        run: sleep "$((${{ inputs.minuten }} * 60))"
-      - name: Testseite und Deployment beenden
-        if: always()
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: bash deploy/preview-vm.sh cleanup
+          sleep "$((PREVIEW_MINUTES * 60))"

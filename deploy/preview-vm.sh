@@ -42,6 +42,7 @@ case "${1:-}" in
     chmod 600 .env
     docker compose config --quiet
     docker compose up -d --no-build --pull never
+    printf '%s\n' "$url" > "$RUNNER_TEMP/preview-url"
     echo "url=$url" >> "$GITHUB_OUTPUT"
     ;;
   check)
