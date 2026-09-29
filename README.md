@@ -55,7 +55,7 @@ Für eine feste öffentliche Domain `APP_ORIGIN` vor dem Start des Node-Prozesse
 
 ## Docker und GitHub Actions
 
-Das `Dockerfile` erstellt ein Node-22-Produktionsimage mit den per `npm ci --omit=dev` installierten Abhängigkeiten. `.dockerignore` hält lokale Daten, Zugangsdaten und Entwicklungsdateien aus dem Build-Kontext heraus. Lokal bauen: `docker build -t grillabend .` (im Projektverzeichnis).
+Das `Dockerfile` erstellt ein Node-22-Produktionsimage auf Debian Trixie slim (auf einen Image-Digest fixiert) mit den per `npm ci --omit=dev` installierten Abhängigkeiten. Trixie stellt die vom nativen `sqlite3`-Modul benötigte glibc-Version bereit; das vorherige Bookworm-Image konnte trotz erfolgreichem Build nicht starten. `.dockerignore` hält lokale Daten, Zugangsdaten und Entwicklungsdateien aus dem Build-Kontext heraus. Lokal bauen: `docker build -t grillabend .` (im Projektverzeichnis).
 
 Für die vorhandene Nginx-Vorlage auf einem **Linux-Host** den Container im Host-Netzwerk starten: Node bleibt dadurch auf `127.0.0.1:621` erreichbar, und Express vertraut weiterhin nur dem lokalen Proxy. Ein normaler Docker-Port-Forward (`-p`) funktioniert mit diesem Loopback-Listener nicht. Der Host muss Port 621 intern halten; nur Nginx stellt HTTPS öffentlich bereit.
 

@@ -6,6 +6,7 @@ Frühere Einträge nennen die damaligen Dateipfade; die aktuelle Struktur steht 
 
 ## 2026-09-29
 
+- Den durch CI-Container-Logs belegten Startfehler des nativen `sqlite3`-Bindings (`GLIBC_2.38` nicht im Bookworm-Image vorhanden) mit der Umstellung der Node-22-Basis auf Debian Trixie slim adressiert; das mehrarchitekturfähige Basisimage per Digest fixiert. Der GitHub-Smoke-Test prüft den Containerstart vor einer Veröffentlichung (`Dockerfile`, [[entwicklung/lokal-starten]]).
 - Nach dem ersten fehlgeschlagenen Container-Smoke-Test die sofortige Entfernung des Testcontainers deaktiviert und seine Startlogs im immer ausgeführten Cleanup sichtbar gemacht. Test und Image-Build liefen im ersten GitHub-Lauf erfolgreich; die Ursache des nicht erreichbaren Testcontainers ist damit noch nicht behauptet (`.github/workflows/docker.yml`, [[entwicklung/lokal-starten]]).
 - Den vom Projektverantwortlichen ergänzten Listener im Entwicklungsmodus auf `0.0.0.0` für Zugriff aus dem lokalen Netzwerk in diesen Commit übernommen; die Produktionsbindung an Loopback und HTTPS-Proxy bleibt bestehen. Startmeldung und Betriebsdokumentation an die tatsächliche Bindung angepasst (`server.js`, `README.md`, [[architektur/ueberblick]], [[entwicklung/lokal-starten]], [[entscheidungen/neuaufbau]]).
 - Das Einstellungs-Zahnrad im Nutzerkopf unmittelbar links vor den Benutzernamen gesetzt; Aussehen und Dialogverhalten bleiben erhalten (`public/index.html`, [[design/erscheinungsbild]], [[features/anmeldung-und-teilnahme]]).
