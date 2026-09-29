@@ -1,0 +1,25 @@
+# Gewünschtes Erscheinungsbild
+
+Der Projektverantwortliche hat die **Oberfläche des importierten Projekts** als gewünschte visuelle Referenz benannt. Die Teilnehmer- und Adminseite führen diesen Stil fort (`public/index.html`, `public/admin.html`, `public/css/`). Bei Änderungen an der Oberfläche dieses Erscheinungsbild als Ausgangspunkt verwenden; Sicherheits- und Funktionsänderungen sind damit nicht ausgeschlossen. Neue Bildmotive, Logos oder ein abweichendes Designsystem sind nicht festgelegt.
+
+## Farben und Typografie
+
+- Dunkler Hintergrund `#0a0a16`, heller Text `#f0f0f5`; Akzente Pink `#ff2a85`, Cyan `#00f0ff` und Violett `#8a2be2` (`public/css/style.css`, `:root`).
+- Die Oberfläche nutzt **Outfit** mit Sans-Serif-Fallback; beide HTML-Seiten binden die Schrift über Google Fonts ein (`public/css/style.css`).
+- Überschriften haben einen Pink-Cyan-Verlauf; der primäre Button einen Pink-Violett-Verlauf (`public/css/style.css`).
+
+## Layout und Komponenten
+
+- Dunkles, halbtransparentes Kartenlayout mit Weichzeichnung, dünner heller Kontur, abgerundeten Ecken und schmaler farbiger Oberkante. Die Teilnehmerkarte ist höchstens `500px` breit (`public/css/style.css`, `.container`). Im Hintergrund liegen farbige radiale Lichtflächen mit dezenter Animation (`.background-animation`).
+- Auswahlfelder werden als klickbare Karten mit visuell ausgeblendeten, per Tastatur erreichbaren Radiobuttons dargestellt; aktive Zustände erhalten farbige Konturen. Primäre Aktionen nutzen einen großen Verlaufsbutton, Löschaktionen einen rot getönten Button (`public/css/style.css`, `.radio-card`, `.submit-btn`, `.delete-btn`).
+- Termin, Ort, Regeln, Informationen und Karten-Pin erscheinen in einer Informationskarte; Zusagen als Teilnehmerliste mit farbigen Status-Badges und Statistik-Kacheln (`public/index.html`, `public/css/style.css`). Nur das Löschen benutzt noch ein dunkles Modal mit Overlay (`public/css/modal.css`).
+- Die Adminseite unter `/admin` ist eine eigenständige, breitere Karte mit Formular, klickbarem Karten-Picker, Belegungsübersicht und Vorschau; ihr Layout steht in `public/css/admin.css` und nutzt dieselben Grundfarben und Komponenten. Das Suchfeld liegt als Overlay **oben rechts mit je `5px` Abstand** zum Kartenrand und `5px` Innenabstand (`.pin-search`). Die farbige Oberkante wird an den abgerundeten Ecken der Adminkarte begrenzt (`.admin-shell` mit `overflow: hidden`). Der Löschdialog steht direkt unter `<body>` und wird nicht von der Teilnehmerkarte abgeschnitten (`public/index.html`, `public/css/modal.css`).
+- Für schmale Ansichten gibt es Anpassungen in `public/css/style.css` und `public/css/admin.css`. Damit ist keine umfassende Prüfung aller Bildschirmgrößen behauptet.
+
+## Leitlinie für spätere UI-Arbeit
+
+Neue Ansichten und Bedienelemente sollen sich optisch an diesen belegten Farben, Schriften, Karten und Zuständen orientieren. Vor UI-Änderungen die betroffenen Dateien unter `public/` erneut prüfen; das Wiki ist nicht die Quelle der CSS-Werte. Die Beschriftung „Grillabend“ ist noch kein bestätigter endgültiger Projektname (siehe [[projekt/ueberblick]]). `Unklar:` Ob zusätzlich eine Bildvorlage oder konkrete Änderungswünsche zur Darstellung folgen.
+
+## Verwandte Seiten
+
+[[projekt/ueberblick]] · [[features/anmeldung-und-teilnahme]] · [[features/administration]] · [[planung]]

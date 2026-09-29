@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="de">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Adminbereich – Grillabend</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" href="/vendor/leaflet/leaflet.css">
+    <link rel="stylesheet" href="/css/admin.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <script src="/vendor/leaflet/leaflet.js" defer></script>
+    <script src="/js/admin.js" defer></script>
+</head>
+<body>
+    <div class="background-animation" aria-hidden="true"></div>
+    <main class="container admin-shell">
+        <header class="admin-header">
+            <div>
+                <p class="info-label">Organisation · <span id="adminUser"></span></p>
+                <h1>⚙️ Adminbereich</h1>
+                <p>Veranstaltung, Plätze und Hinweise an einem Ort verwalten.</p>
+            </div>
+            <a class="logout-btn" href="/">← Zur Teilnehmerseite</a>
+        </header>
+
+        <div class="admin-grid">
+            <form id="adminForm" class="admin-panel" aria-label="Veranstaltungsdaten bearbeiten">
+                <h2>Veranstaltung</h2>
+                <div class="form-group"><label for="adminDate">Datum &amp; Uhrzeit</label><input type="text" id="adminDate" maxlength="300"></div>
+                <div class="form-group"><label for="adminLocationName">Ort</label><input type="text" id="adminLocationName" maxlength="300"></div>
+                <div class="form-group"><label for="adminLocationAddress">Adresse (Anzeige und Fallback ohne Pin)</label><input type="text" id="adminLocationAddress" maxlength="300"></div>
+                <div class="form-group">
+                    <p class="pin-label">Treffpunkt auf Karte setzen</p>
+                    <p class="form-note">Karte verschieben, hineinzoomen und den genauen Ort anklicken.</p>
+                    <div class="pin-map-wrap">
+                        <div id="pinMap" class="pin-map" aria-label="Karte zur Auswahl des Treffpunkts"></div>
+                        <div id="pinSearch" class="pin-search" role="search" aria-label="Ort auf der Karte suchen">
+                            <div class="pin-search-row">
+                                <input id="pinSearchQuery" type="search" maxlength="120" placeholder="Ort oder Adresse suchen" aria-label="Ort oder Adresse suchen">
+                                <button id="pinSearchBtn" type="button" class="logout-btn">Suchen</button>
+                            </div>
+                            <p id="pinSearchStatus" class="hidden pin-search-status" role="status" aria-live="polite"></p>
+                            <ul id="pinSearchResults" class="hidden pin-search-results" aria-label="Suchergebnisse"></ul>
+                        </div>
+                    </div>
+                    <p class="form-note">Die Suche sendet den Suchbegriff an Nominatim (OpenStreetMap). Danach den exakten Pin auf der Karte anklicken.</p>
+                    <div class="pin-toolbar">
+                        <span id="pinStatus" role="status" aria-live="polite">Noch kein Pin gesetzt.</span>
+                        <button id="clearPinBtn" type="button" class="logout-btn">Pin entfernen</button>
+                    </div>
+                    <label for="adminMapsUrl">Google-Maps-Link</label>
+                    <input type="url" id="adminMapsUrl" readonly placeholder="Wird beim Setzen des Pins automatisch erzeugt">
+                    <p class="form-note">Der Pin und der Link werden erst mit „Änderungen speichern“ übernommen. Ein vorhandener Link ohne Pin bleibt zunächst erhalten.</p>
+                </div>
+
+                <h2>Kapazitäten</h2>
+                <div class="admin-two-columns">
+                    <div class="form-group"><label for="adminMaxCabin">Max. Schlafplätze</label><input type="number" id="adminMaxCabin" min="1" max="1000" required></div>
+                    <div class="form-group"><label for="adminMaxBett">Max. Bettgarnituren</label><input type="number" id="adminMaxBett" min="0" max="1000" required></div>
+                </div>
+
+                <h2>Hinweise für Mitglieder</h2>
+                <div class="form-group"><label for="adminInfo">Informationen</label><textarea id="adminInfo" maxlength="4000" rows="4"></textarea></div>
+                <div class="form-group"><label for="adminRules">Regeln</label><textarea id="adminRules" maxlength="4000" rows="4"></textarea></div>
+                <p id="adminMessage" class="hidden message" role="status" aria-live="polite"></p>
+                <button type="submit" id="saveAdminBtn" class="submit-btn">Änderungen speichern 💾</button>
+            </form>
+
+            <aside class="admin-sidebar" aria-label="Aktueller Stand">
+                <section class="admin-panel">
+                    <h2>Belegung</h2>
+                    <div class="admin-stats">
+                        <div class="stat-box"><span id="usedCabin">–</span> Hüttenschlafplätze</div>
+                        <div class="stat-box"><span id="usedBedding">–</span> Bettgarnituren</div>
+                    </div>
+                    <p class="form-note">Eine Kapazität kann nicht unter die bereits belegten Plätze gesenkt werden.</p>
+                </section>
+                <section class="admin-panel">
+                    <h2>Vorschau</h2>
+                    <p class="info-label">Wann?</p><p id="previewDate" class="preview-value"></p>
+                    <p class="info-label">Wo?</p><p id="previewLocation" class="preview-value"></p>
+                    <p id="previewAddress" class="multiline"></p>
+                    <a id="previewMapsLink" class="maps-link hidden" target="_blank" rel="noopener noreferrer">Auf Google Maps öffnen 🗺️</a>
+                    <p class="info-label">Informationen</p><p id="previewInfo" class="multiline"></p>
+                    <p class="info-label">Regeln</p><p id="previewRules" class="multiline"></p>
+                </section>
+            </aside>
+        </div>
+    </main>
+</body>
+</html>

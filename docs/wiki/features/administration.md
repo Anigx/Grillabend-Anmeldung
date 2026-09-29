@@ -1,0 +1,13 @@
+# Veranstaltungsadministration
+
+Admins öffnen über den Link auf der Teilnehmerseite die **eigene HTML-Seite `/admin`** (`public/admin.html`, `public/js/admin.js`, `public/css/admin.css`). Das Formular enthält Datum/Uhrzeit, Ort, Adresse, einen klickbaren Karten-Picker für den Treffpunkt, Schlafplatz- und Bettgarnitur-Kapazitäten, Informationen und Regeln. Oben rechts in der Karte steht eine Suche: Erst ein Klick auf „Suchen“ bzw. Enter fragt Nominatim nach Orten; eine Auswahl zentriert die Karte, **setzt aber noch keinen Pin**. Erst ein Klick auf die gewünschte Kartenposition setzt den Pin; „Pin entfernen“ entfernt ihn. Der Google-Maps-Link wird aus den Koordinaten erzeugt. Erst der Speichern-Button schreibt Änderungen in die Datenbank. Eine Seitenleiste zeigt belegte Plätze und eine Vorschau; der gemeinsame dunkle Stil kommt aus `public/css/style.css`.
+
+`GET /api/admin/party-info` liefert die editierbaren Felder, gespeicherte Koordinaten und den aktuellen Belegungsstand; `PUT /api/admin/party-info` validiert und speichert sie. **Beide Methoden und `/admin` erfordern eine serverseitig geprüfte Admin-Sitzung** (`src/server.js`). Kapazitäten können nicht unter belegte Plätze gesetzt werden. Bei gesetztem Pin erzeugt der Server den Google-Maps-Link aus den Koordinaten; ein vorhandener Link ohne Pin bleibt zunächst erhalten. `GET /api/party-info` bleibt der getrennte Lese-Endpunkt für angemeldete Mitglieder; `POST /api/party-info` ist nicht mehr vorhanden. Siehe [[api/http-endpunkte]].
+
+Eine bestehende Adminberechtigung wird aus Alt-Konten übernommen. Für neue Installationen können beim Start `ADMIN_USERNAME` und `ADMIN_PASSWORD` ein Admin-Konto einrichten; die öffentliche Registrierung vergibt keine Adminrechte (`src/server.js`, `README.md`). Diese Umgebungsvariablen enthalten Zugangsdaten und dürfen nicht ins Wiki geschrieben werden.
+
+Auf der Teilnehmerseite wird der Google-Maps-Pin bei vorhandenen Koordinaten genau über diese platziert; nur ohne gespeicherten Pin wird weiterhin die Adresse als Suchort verwendet (`public/js/app.js`). Der Karten-Picker und die manuell ausgelöste Ortssuche benötigen eine Internetverbindung zu OpenStreetMap-Kacheln bzw. Nominatim, aber keinen Google-Maps-API-Schlüssel. Der Suchtext wird direkt aus dem Browser an Nominatim übertragen; automatische Abfragen beim Tippen gibt es nicht (`public/js/admin.js`). `Unklar:` Der tatsächliche Treffpunkt ist erst bestimmt, wenn ein Admin den Pin passend gesetzt und gespeichert hat.
+
+## Verwandte Seiten
+
+[[features/anmeldung-und-teilnahme]] · [[design/erscheinungsbild]] · [[api/http-endpunkte]] · [[daten/sqlite]] · [[entscheidungen/neuaufbau]]

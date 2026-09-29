@@ -1,0 +1,91 @@
+/* Custom Modal */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100dvh;
+    background: rgba(10, 10, 22, 0.85);
+    backdrop-filter: blur(4px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 100;
+    border-radius: 0;
+    animation: fadeIn 0.3s ease;
+}
+
+.modal-content {
+    background: var(--bg-color);
+    border: 1px solid var(--accent-1);
+    box-shadow: 0 0 30px rgba(255, 42, 133, 0.2);
+    padding: 2rem;
+    border-radius: 16px;
+    text-align: center;
+    width: 85%;
+    max-width: 350px;
+    animation: slideInTop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    max-height: min(85vh, 780px);
+    overflow-y: auto;
+}
+
+.modal-content h2 {
+    margin-bottom: 0.5rem;
+    color: white;
+}
+
+.modal-content p {
+    margin-bottom: 1.5rem;
+    font-size: 0.9rem;
+}
+
+.modal-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+}
+
+.cancel-btn,
+.confirm-delete-btn {
+    padding: 0.8rem 1rem;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    flex: 1;
+}
+
+.cancel-btn {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+}
+
+.cancel-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.confirm-delete-btn {
+    background: rgba(255, 71, 87, 0.2);
+    border: 1px solid rgba(255, 71, 87, 0.5);
+    color: #ff4757;
+}
+
+.confirm-delete-btn:hover {
+    background: #ff4757;
+    color: white;
+    box-shadow: 0 5px 15px rgba(255, 71, 87, 0.4);
+    transform: translateY(-2px);
+}
+
+@keyframes slideInTop {
+    from {
+        opacity: 0;
+        transform: translateY(-30px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}

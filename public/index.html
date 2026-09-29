@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="de">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Grillabend – Anmeldung</title>
+    <meta name="description" content="Anmeldung und Planung für unseren Grillabend.">
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" href="/css/modal.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <script src="/js/app.js" defer></script>
+</head>
+<body>
+    <div class="background-animation" aria-hidden="true"></div>
+
+    <main class="container" id="authContainer">
+        <header>
+            <h1>🐾 Grillabend</h1>
+            <p>Bitte melde dich an oder erstelle einen Account.</p>
+        </header>
+        <form id="authForm">
+            <div class="form-group">
+                <label for="username">Name</label>
+                <input id="username" name="username" type="text" autocomplete="username" maxlength="40" minlength="2" required>
+            </div>
+            <div class="form-group">
+                <label for="password">Passwort</label>
+                <input id="password" name="password" type="password" autocomplete="current-password" required>
+            </div>
+            <div class="form-actions">
+                <button class="submit-btn" id="loginBtn" type="submit">Anmelden 🐾</button>
+                <button class="submit-btn secondary-btn" id="registerBtn" type="button">Registrieren 📝</button>
+            </div>
+            <p class="form-note">Bei der Registrierung: Passwort mit mindestens 12 Zeichen wählen.</p>
+            <p id="authMessage" class="hidden message" role="status" aria-live="polite"></p>
+        </form>
+    </main>
+
+    <main class="container hidden" id="rsvpContainer">
+        <header>
+            <div class="user-header">
+                <span id="loggedInUser"></span>
+                <div class="header-actions">
+                    <a id="adminBtn" class="logout-btn hidden" href="/admin">Admin ⚙️</a>
+                    <button type="button" id="logoutBtn" class="logout-btn">Abmelden</button>
+                </div>
+            </div>
+            <h1>🐾 Grillabend</h1>
+            <p>Trag dich ein, damit wir planen können!</p>
+        </header>
+
+        <section class="party-info-card" aria-label="Veranstaltungsdetails">
+            <div class="info-row"><span class="info-icon" aria-hidden="true">📅</span><div class="info-content"><span class="info-label">Wann?</span><span class="info-value" id="displayDate"></span></div></div>
+            <div class="info-row"><span class="info-icon" aria-hidden="true">📍</span><div class="info-content"><span class="info-label">Wo?</span><span class="info-value" id="displayLocationName"></span><span class="info-subvalue" id="displayLocationAddress"></span><a id="displayMapsLink" class="maps-link hidden" target="_blank" rel="noopener noreferrer">Auf Google Maps zeigen 🗺️</a></div></div>
+            <div id="mapSection" class="hidden"><iframe id="mapFrame" class="map-frame" title="Karte des Veranstaltungsorts" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe><p class="form-note">Beim Laden der Karte werden Daten an Google übertragen.</p></div>
+            <div id="infoSection" class="hidden"><span class="info-label">Informationen</span><p id="displayInfo" class="multiline"></p></div>
+            <div id="rulesSection" class="hidden"><span class="info-label">Regeln</span><p id="displayRules" class="multiline"></p></div>
+        </section>
+
+        <form id="rsvpForm">
+            <fieldset class="form-group choice-group">
+                <legend>Bist du dabei?</legend>
+                <div class="radio-group">
+                    <input type="radio" id="kommt_ja" name="kommt" value="Ja"><label class="radio-card" for="kommt_ja">✅ Ja!</label>
+                    <input type="radio" id="kommt_nein" name="kommt" value="Nein"><label class="radio-card" for="kommt_nein">❌ Nein</label>
+                    <input type="radio" id="kommt_vielleicht" name="kommt" value="Vielleicht"><label class="radio-card" for="kommt_vielleicht">🤔 Vielleicht</label>
+                </div>
+            </fieldset>
+            <fieldset class="form-group choice-group" id="cabinGroup">
+                <legend>Willst du in der Hütte schlafen?</legend>
+                <div class="radio-group">
+                    <input type="radio" id="huette_ja" name="huette" value="Ja"><label class="radio-card" for="huette_ja">🛏️ Ja <small id="huetteVollHint" class="hidden">Schon voll!</small></label>
+                    <input type="radio" id="huette_nein" name="huette" value="Nein"><label class="radio-card" for="huette_nein">🏠 Nein</label>
+                </div>
+            </fieldset>
+            <fieldset class="form-group choice-group hidden" id="bettgarniturGroup">
+                <legend>Bettgarnitur benötigt?</legend>
+                <div class="radio-group">
+                    <input type="radio" id="bett_ja" name="bettgarnitur" value="Ja"><label class="radio-card" for="bett_ja">🛌 Ja <small id="bettVollHint" class="hidden">Schon voll!</small></label>
+                    <input type="radio" id="bett_nein" name="bettgarnitur" value="Nein" checked><label class="radio-card" for="bett_nein">🎒 Nein</label>
+                </div>
+            </fieldset>
+            <p id="vielleichtHint" class="hidden hint-box">Bei „Vielleicht“ wird kein Schlafplatz reserviert.</p>
+            <div class="form-actions">
+                <button type="submit" class="submit-btn" id="submitBtn">Eintragen 🐾</button>
+                <button type="button" class="delete-btn hidden" id="deleteBtn">Eintrag löschen 🗑️</button>
+            </div>
+            <p id="rsvpMessage" class="hidden message" role="status" aria-live="polite"></p>
+        </form>
+
+        <section class="attendee-list-section">
+            <h2>Wer ist schon dabei?</h2>
+            <div class="stats">
+                <div class="stat-box"><span id="count_ja">0</span> Ja</div>
+                <div class="stat-box"><span id="count_vielleicht">0</span> Vielleicht</div>
+                <div class="stat-box"><span id="count_huette">0/15</span> In der Hütte</div>
+                <div class="stat-box"><span id="count_bettgarnitur">0/10</span> Bettgarnitur</div>
+            </div>
+            <ul id="attendeeList" class="attendee-list"></ul>
+        </section>
+    </main>
+
+    <div id="deleteModal" class="hidden modal-overlay" role="dialog" aria-modal="true" aria-labelledby="deleteTitle">
+        <div class="modal-content">
+            <h2 id="deleteTitle">Eintrag löschen?</h2><p>Deine Anmeldung wird entfernt.</p>
+            <div class="modal-actions"><button type="button" id="cancelDeleteBtn" class="cancel-btn">Abbrechen</button><button type="button" id="confirmDeleteBtn" class="confirm-delete-btn">Ja, löschen</button></div>
+        </div>
+    </div>
+
+</body>
+</html>

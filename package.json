@@ -1,0 +1,19 @@
+{
+  "name": "grillabend-anmeldung",
+  "version": "2.0.0",
+  "description": "Anmeldung und Planung für einen Grillabend",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "express": "^5.2.1",
+    "leaflet": "^1.9.4",
+    "sqlite3": "^6.0.1"
+  }
+}

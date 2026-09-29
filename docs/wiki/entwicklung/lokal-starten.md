@@ -1,0 +1,25 @@
+# Lokale Entwicklung und Betrieb
+
+`package.json` definiert ein CommonJS-Node-Projekt mit Express 5, `sqlite3` 6 und Leaflet für die Karten-Pin-Auswahl; `package-lock.json` fixiert die Abhängigkeiten. Voraussetzung ist Node.js 22 oder neuer. Nach `npm install` startet `npm start` den Einstieg `server.js` auf `http://localhost:621`; in PowerShell mit gesperrten Skripten `npm.cmd` verwenden (`package.json`, `README.md`). Der frühere `dev`-Alias war identisch mit `start` und wurde entfernt. `npm test` startet `test/app.test.js` und `test/security.test.js` mit temporären Datenbanken, ohne die Altdateien im Projekt zu ändern.
+
+Ordnung der Dateien: `server.js` startet die Anwendung aus `src/server.js`; `src/db.js` und `src/security.js` enthalten Datenzugriff und Kryptografie. `public/index.html`/`public/js/app.js` bedienen die Teilnehmerseite, `public/admin.html`/`public/js/admin.js` die Adminseite; CSS liegt in `public/css/`. Nur die expliziten HTTP-Routen in `src/server.js` machen Browserdateien zugänglich. Die aktuelle Struktur und Datenflüsse stehen in [[architektur/ueberblick]].
+
+## Sicherheitstests
+
+`test/security.test.js` prüft Passwort-Hashes mit unabhängigem Salt, Passwortvergleich und Session-Token-Hashes. `test/app.test.js` prüft über HTTP unter anderem: Registrierung und Admin-Selbstvergabe, gleichzeitige gleichnamige Registrierungen, Cookie-Attribute und Session-Ablauf, fremde Origins, geschützte Admin-HTML-Seite und getrennten Admin-API-Pfad, Admin- und RSVP-Rechte, Maps-URL-/Koordinatenvalidierung, Erzeugung und Entfernen eines Pins, Erhalt bestehender Ortsdaten bei der SQLite-Schema-Ergänzung, parallele Kapazitätsbuchung, Begrenzung von Loginversuchen, ungültige/zu große JSON-Bodies, Zugriff auf interne Dateien und die transaktionale Alt-Datenübernahme einschließlich Abbruch bei fehlendem Alt-Passwort. Der Testlauf verwendet ausschließlich künstliche Zugangsdaten und temporäre SQLite-Dateien.
+
+Die Tests prüfen den Server und seine API sowie kryptografische Hilfsfunktionen. Der Admin-Karten-Picker benötigt für OpenStreetMap-Kacheln und die manuelle Ortssuche über Nominatim eine Netzverbindung; Leaflet-JS/-CSS werden nach `npm install` lokal über `/vendor/leaflet/` ausgeliefert. `Unklar:` Die Ortssuche im Browser und ein produktiver HTTPS-/Mehrinstanzbetrieb wurden mit den automatisierten Tests nicht verifiziert.
+
+`PORT` und `DATA_DIR` sind konfigurierbar; `ADMIN_USERNAME` und `ADMIN_PASSWORD` richten bei einem frischen Start getrennt von der öffentlichen Registrierung einen Admin ein. Beide Admin-Variablen gehören zusammen. `NODE_ENV=production` markiert das Session-Cookie als `Secure` (`src/server.js`, `README.md`).
+
+## HTTPS in Produktion
+
+`server.js` bindet bei `NODE_ENV=production` nur an `127.0.0.1` (Standardport `621`), während der lokale Nginx-Reverse-Proxy die öffentliche TLS-Verbindung beendet. Express vertraut ausschließlich Loopback als Proxy und weist HTTP-Anfragen ohne bestätigtes HTTPS mit Status `426` zurück (`src/server.js`, `test/app.test.js`). Die Datei `deploy/nginx.conf.example` ist eine **nicht aktivierte Vorlage**: Nginx leitet Port 80 zu HTTPS um, nutzt auf Port 443 Zertifikat und Schlüssel und setzt `Host`, `X-Forwarded-Proto: https` sowie die Client-IP vor dem internen Proxying. Domain und Zertifikatsdateipfade sind noch einzutragen; nie Schlüsselwerte in Wiki oder Repo übernehmen. Der Proxy muss für diese Konfiguration auf demselben Host laufen. Ohne Produktionsmodus bleibt lokales HTTP zulässig.
+
+`Unklar:` Domain, Pfade zu den vorhandenen Zertifikatsdateien, Zielplattform und die tatsächlich installierte Nginx-Konfiguration. Die HTTPS-Vorlage wurde nicht auf einem produktiven Host aktiviert oder mit echten Zertifikaten geprüft.
+
+Die automatische Alt-Datenübernahme ist in [[daten/sqlite]] erklärt. `.gitignore` schließt `data/`, `*.sqlite*` und `node_modules/` aus. Die laufende App ist für eine einzelne Serverinstanz konzipiert; vor Mehrinstanzbetrieb oder öffentlichem Einsatz offene Punkte in [[planung]] klären.
+
+## Verwandte Seiten
+
+[[architektur/ueberblick]] · [[daten/sqlite]] · [[planung]] · [[wiki-pflege]]
