@@ -42,6 +42,9 @@ case "${1:-}" in
     chmod 600 .env
     docker compose config --quiet
     docker compose up -d --no-build --pull never
+    docker compose ps --all
+    container=$(docker compose ps --all --quiet grillabend)
+    docker inspect --format 'Container-Start: {{json .State}} | RestartCount: {{.RestartCount}} | NetworkMode: {{.HostConfig.NetworkMode}}' "$container"
     printf '%s\n' "$url" > "$RUNNER_TEMP/preview-url"
     echo "url=$url" >> "$GITHUB_OUTPUT"
     ;;
@@ -63,6 +66,12 @@ case "${1:-}" in
       echo 'Nginx erreicht den Container nicht:' >&2
       docker compose ps --all || true
       docker compose logs grillabend || true
+      container=$(docker compose ps --all --quiet grillabend)
+      docker inspect --format 'Container-Endzustand: {{json .State}} | RestartCount: {{.RestartCount}} | NetworkMode: {{.HostConfig.NetworkMode}}' "$container" || true
+      docker events --since 3m --until "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+        --filter "container=$container" --format '{{json .}}' || true
+      echo 'Host-Listener auf Port 621:' >&2
+      sudo ss -ltnp '( sport = :621 )' || true
       sudo tail -n 30 /var/log/nginx/error.log || true
       exit 1
     fi
