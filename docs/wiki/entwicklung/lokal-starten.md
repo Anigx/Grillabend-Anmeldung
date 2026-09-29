@@ -20,6 +20,12 @@ Die Tests prüfen den Server und seine API, kryptografische Hilfsfunktionen sowi
 
 Für eine festgelegte öffentliche Domain sollte der Node-Prozess mit `APP_ORIGIN=https://...` gestartet werden; sie muss dem von Nginx weitergegebenen Host entsprechen. Nginx setzt den Wert nicht. Bei konfigurierter HTTP-Origin in Produktion verweigert die Anwendung den Start (`src/server.js`, `test/app.test.js`).
 
+## Container-Image und CI
+
+`Dockerfile` verwendet Node 22 (Debian slim), installiert nur Produktionsabhängigkeiten aus `package-lock.json` und startet als Benutzer `node` mit `NODE_ENV=production`, `PORT=621` und `DATA_DIR=/app/data`. `.dockerignore` verhindert insbesondere, dass lokale SQLite-Dateien, `data/`, Env-Dateien und `node_modules/` in den Build-Kontext gelangen. Unter Linux benötigt der Container `--network host`, weil `server.js` absichtlich nur an Loopback bindet und Express nur dem lokalen HTTPS-Proxy vertraut. Die Host-Nginx-Vorlage unter `deploy/nginx.conf.example` kann so auf `127.0.0.1:621` weiterleiten. Ein Docker-Volume an `/app/data` bewahrt die Datenbank bei Image-Updates; der Containerbenutzer benötigt Schreibrechte (UID 1000). Bestehende Daten nur bei gestopptem Server kopieren und separat sichern. Startbeispiel und benötigte Umgebungsvariablen stehen in `README.md`.
+
+`.github/workflows/docker.yml` führt `npm ci`/`npm test` aus und baut das Image per Buildx bei Pull Requests nach `main`, Pushes auf `main` und `v*`-Tags sowie manueller Auslösung. Pull Requests veröffentlichen nichts; andere Läufe veröffentlichen in GHCR über `GITHUB_TOKEN` (`packages: write`). Branch-, Tag- und SHA-Tags werden generiert, `latest` nur für `main`. Docker ist in der lokalen Windows-Umgebung für einen tatsächlichen Image-Build nicht verfügbar; die produktive Host-/TLS-Konfiguration bleibt ebenfalls ungetestet.
+
 `Unklar:` Domain, Pfade zu den vorhandenen Zertifikatsdateien, Zielplattform und die tatsächlich installierte Nginx-Konfiguration. Die HTTPS-Vorlage wurde nicht auf einem produktiven Host aktiviert oder mit echten Zertifikaten geprüft.
 
 Die automatische Alt-Datenübernahme ist in [[daten/sqlite]] erklärt. `.gitignore` schließt `data/`, `*.sqlite*` und `node_modules/` aus. Die laufende App ist für eine einzelne Serverinstanz konzipiert; vor Mehrinstanzbetrieb oder öffentlichem Einsatz offene Punkte in [[planung]] klären.

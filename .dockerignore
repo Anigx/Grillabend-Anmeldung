@@ -1,0 +1,16 @@
+.git/
+.github/
+.agents/
+.opencode/
+node_modules/
+data/
+test/
+docs/
+deploy/
+.env*
+*.sqlite*
+*.pem
+*.key
+README.md
+AGENTS.md
+skills-lock.json

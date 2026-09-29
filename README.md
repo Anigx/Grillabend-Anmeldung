@@ -48,3 +48,23 @@ Node lauscht auch in Produktion (`NODE_ENV=production`) ausschließlich auf `127
 `deploy/nginx.conf.example` zeigt die nötigen Nginx-Einstellungen: Auf Port 80 erfolgt nur eine Weiterleitung zu HTTPS; Port 443 verwendet Zertifikat und Schlüssel, leitet an `127.0.0.1:621` weiter, setzt `Host` und **überschreibt** `X-Forwarded-Proto` mit `https`. Vor Einsatz Domain und beide **Dateipfade** ersetzen; keine Zertifikate oder privaten Schlüssel ins Repository übernehmen. Die Vorlage ist noch nicht produktiv aktiviert, weil Domain und Pfade noch nicht feststehen. Der Proxy muss auf demselben Host wie Node laufen; für eine andere Topologie ist die Vertrauens- und Bindungskonfiguration neu festzulegen.
 
 Für eine feste öffentliche Domain `APP_ORIGIN` vor dem Start des Node-Prozesses auf deren HTTPS-Origin setzen; der Wert wird nicht durch Nginx gesetzt. Dadurch bleiben Host, Protokoll und Origin der Schreibanfragen an eine Adresse gebunden.
+
+## Docker und GitHub Actions
+
+Das `Dockerfile` erstellt ein Node-22-Produktionsimage mit den per `npm ci --omit=dev` installierten Abhängigkeiten. `.dockerignore` hält lokale Daten, Zugangsdaten und Entwicklungsdateien aus dem Build-Kontext heraus. Lokal bauen: `docker build -t grillabend .` (im Projektverzeichnis).
+
+Für die vorhandene Nginx-Vorlage auf einem **Linux-Host** den Container im Host-Netzwerk starten: Node bleibt dadurch auf `127.0.0.1:621` erreichbar, und Express vertraut weiterhin nur dem lokalen Proxy. Ein normaler Docker-Port-Forward (`-p`) funktioniert mit diesem Loopback-Listener nicht. Der Host muss Port 621 intern halten; nur Nginx stellt HTTPS öffentlich bereit.
+
+```sh
+docker volume create grillabend-data
+docker run -d --name grillabend --restart unless-stopped --network host \
+  --mount type=volume,src=grillabend-data,dst=/app/data \
+  --env-file /pfad/ausserhalb/des/repos/production.env \
+  ghcr.io/<owner>/<repo>:latest
+```
+
+Die private Env-Datei muss `APP_ORIGIN=https://<oeffentliche-domain>` enthalten, passend zum von Nginx durchgereichten `Host`; für die erstmalige Einrichtung eines Admins außerdem `ADMIN_USERNAME` und `ADMIN_PASSWORD` gemeinsam (Passwort mindestens zwölf Zeichen). `NODE_ENV=production`, `PORT=621` und `DATA_DIR=/app/data` sind bereits im Image gesetzt. Nginx wie in `deploy/nginx.conf.example` auf demselben Host betreiben und die Domain sowie Zertifikatspfade dort ersetzen. Weder Env-Datei noch Zertifikate ins Repository legen.
+
+Das Volume enthält `app.sqlite` und muss bei einem Container-Update wieder eingebunden werden. Bei einem Umzug die vorhandene Datenbank **bei gestopptem Server** in das Volume übertragen und sicherstellen, dass der Containerbenutzer `node` (UID 1000) sie und das Verzeichnis schreiben kann; sonst beginnt die App mit einer neuen, leeren Datenbank. Datenbank und Volume separat sichern.
+
+`.github/workflows/docker.yml` startet bei Pull Requests nach `main` Tests und einen Image-Build ohne Veröffentlichung. Pushes nach `main` sowie Tags `v*` testen, bauen und veröffentlichen nach `ghcr.io/<owner>/<repo>` mit Branch-/Tag- und Commit-SHA-Tag; `main` erhält zusätzlich `latest`. Manuelle Starts sind ebenfalls möglich. Für die Veröffentlichung nutzt der Workflow das automatisch bereitgestellte `GITHUB_TOKEN` mit `packages: write`; für den Download privater Images wird ein entsprechender Registry-Zugang auf dem Host benötigt. Image-Name und `<owner>/<repo>` in den Befehlen durch den tatsächlichen GitHub-Pfad in Kleinbuchstaben ersetzen.

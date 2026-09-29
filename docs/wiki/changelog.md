@@ -6,6 +6,7 @@ Frühere Einträge nennen die damaligen Dateipfade; die aktuelle Struktur steht 
 
 ## 2026-09-29
 
+- Docker-Produktionsimage mit Node 22, getrenntem SQLite-Volume und ausgeschlossenen lokalen Build-Dateien ergänzt. GitHub Actions testet und baut bei PRs sowie Pushes; Pushes und manuelle Läufe veröffentlichen in GHCR. Linux-Start über Host-Netzwerk hinter lokalem Nginx dokumentiert (`Dockerfile`, `.dockerignore`, `.github/workflows/docker.yml`, `README.md`, [[entwicklung/lokal-starten]], [[architektur/ueberblick]], [[entscheidungen/neuaufbau]]).
 - Der Tab „Neuer Grillabend“ zeigt zunächst nur Erklärung und Button; der Warn-Dialog öffnet erst durch einen Klick auf „Alle Antworten zurücksetzen“. Abstand über dem Button ergänzt (`public/admin.html`, `public/js/admin.js`, `public/css/admin.css`, [[features/administration]], [[design/erscheinungsbild]]).
 - Den Warn- und Passwortdialog für den Admin-Reset explizit im Sichtfeld zentriert; der globale CSS-Reset hatte die Browser-Zentrierung des nativen Dialogs überschrieben (`public/css/admin.css`, [[design/erscheinungsbild]]).
 - Die Erfolgsmeldung nach dem Admin-Reset als fünf Sekunden sichtbaren Hinweis mittig im Sichtfeld umgesetzt (`public/admin.html`, `public/css/admin.css`, `public/js/admin.js`, [[features/administration]], [[design/erscheinungsbild]]).
