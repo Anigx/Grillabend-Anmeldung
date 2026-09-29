@@ -73,6 +73,14 @@ case "${1:-}" in
       echo 'Host-Listener auf Port 621:' >&2
       sudo ss -ltnp '( sport = :621 )' || true
       sudo tail -n 30 /var/log/nginx/error.log || true
+      echo 'Kontrollversuch mit einem einfachen HTTP-Server im selben Image:' >&2
+      docker compose stop grillabend || true
+      docker run --detach --name preview-http-control --network host \
+        grillabend:vm-test node -e 'require("node:http").createServer((req, res) => res.end("ok")).listen(621, "127.0.0.1")' || true
+      sleep 3
+      docker inspect --format 'HTTP-Kontrolle: {{json .State}} | NetworkMode: {{.HostConfig.NetworkMode}}' preview-http-control || true
+      curl --silent --show-error --max-time 3 http://127.0.0.1:621/ || true
+      docker rm --force preview-http-control > /dev/null 2>&1 || true
       exit 1
     fi
     [[ "$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:621/api/session)" == 426 ]]
