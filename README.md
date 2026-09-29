@@ -14,6 +14,8 @@ Im Tab „Neuer Grillabend“ öffnet der Button „Alle Antworten zurücksetzen
 
 Angemeldete Mitglieder öffnen über das Zahnrad links neben ihrem Benutzernamen einen eigenen Einstellungsdialog. Ein Schiebeschalter steuert die Anzeige ihres Namens in der Teilnehmerliste; nach Eingabe des aktuellen Passworts können sie außerdem Benutzername oder Passwort ändern. Beim Namenswechsel bleiben Antwort und aktive Sitzungen erhalten; beim Passwortwechsel werden die übrigen Sitzungen widerrufen und für den aktuellen Browser ein neues Cookie gesetzt. **Alle Konten werden beim ersten Start dieser Version einmalig auf sichtbar gestellt; neue Registrierungen sind ebenfalls sichtbar.** Wer den Schalter anschließend ausschaltet, bleibt auch nach einem Neustart anonym. Bei ausgeschaltetem Schalter steht in der Liste „Anonym“; Antwort und Platzbelegung bleiben erhalten. Die eigene Antwort wird weiterhin als „Du“ markiert; Admins sehen in der geschützten Übersicht die tatsächlichen Namen. Genaue Antwortzeitpunkte werden nur im Adminbereich ausgegeben. **Die Namensanzeige betrifft nur den Namen:** Durch die weiterhin offene Registrierung können neue Mitglieder die übrigen Teilnahmeangaben und den Veranstaltungsort sehen.
 
+Auf schmalen Handybildschirmen stehen Kontoaktionen und Teilnahmefelder untereinander, während der Einstellungsdialog innerhalb des Sichtfelds scrollbar bleibt. In der Adminansicht liegen Ortssuche und Karte untereinander; die User-Tabelle lässt sich seitlich wischen, um alle Spalten zu sehen. Die Desktop-Kartensuche bleibt als Overlay oben rechts auf der Karte.
+
 ## Projektstruktur
 
 - `server.js`: kleiner Startpunkt; `src/server.js`: HTTP-Routen, Sitzungen und Kapazitätslogik.

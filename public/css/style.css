@@ -879,33 +879,41 @@ textarea:focus {
     text-shadow: 0 0 10px var(--accent-2);
 }
 
-@media (max-width: 480px) {
-    .radio-card {
-        padding: 0.6rem 0.2rem;
-        font-size: 0.85rem;
+@media (max-width: 600px) {
+    body {
+        align-items: flex-start;
+        padding: max(1rem, env(safe-area-inset-top)) max(0.75rem, env(safe-area-inset-right))
+            max(1rem, env(safe-area-inset-bottom)) max(0.75rem, env(safe-area-inset-left));
     }
 
     .container {
-        padding: 1.5rem;
+        margin-inline: auto;
+        padding: 1.25rem;
+        border-radius: 20px;
     }
 
-    .form-actions {
-        flex-direction: column;
-    }
+    .user-header { flex-direction: column; align-items: stretch; }
+    .user-identity { width: 100%; }
+    .user-header .header-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; }
+    .header-actions .logout-btn { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; text-align: center; }
+    .header-actions #adminBtn.hidden + #logoutBtn { grid-column: 1 / -1; }
 
-    .rsvp-form,
-    .party-info-card {
-        padding: 1.15rem;
-    }
+    .settings-dialog { width: calc(100% - 1.5rem); max-height: calc(100dvh - 1.5rem); padding: 1.25rem; }
+    .settings-section input[type="text"], .settings-section input[type="password"] { font-size: 1rem; }
+    .settings-section .submit-btn { min-height: 48px; }
 
-    .settings-dialog { padding: 1.25rem; }
-
-    .user-header {
-        flex-wrap: wrap;
-    }
+    .form-actions { flex-direction: column; }
+    .rsvp-form, .party-info-card { padding: 1rem; }
+    .radio-group { gap: 0.5rem; }
+    .radio-card { min-width: 0; min-height: 3.25rem; padding: 0.7rem 0.35rem; font-size: 0.9rem; }
+    .stat-box { min-width: 0; padding: 0.9rem 0.45rem; overflow-wrap: anywhere; }
+    .attendee-item { padding: 0.85rem; }
 }
 
 @media (max-width: 360px) {
+    .radio-group { flex-direction: column; }
+    .radio-card { flex-direction: row; justify-content: flex-start; padding: 0.75rem 0.9rem; text-align: left; }
+
     .password-requirements {
         grid-template-columns: 1fr;
     }

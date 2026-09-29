@@ -40,7 +40,6 @@
                     <p class="pin-label">Treffpunkt auf Karte setzen</p>
                     <p class="form-note">Karte verschieben, hineinzoomen und den genauen Ort anklicken.</p>
                     <div class="pin-map-wrap">
-                        <div id="pinMap" class="pin-map" aria-label="Karte zur Auswahl des Treffpunkts"></div>
                         <div id="pinSearch" class="pin-search" role="search" aria-label="Ort auf der Karte suchen">
                             <div class="pin-search-row">
                                 <input id="pinSearchQuery" type="search" maxlength="120" placeholder="Ort oder Adresse suchen" aria-label="Ort oder Adresse suchen">
@@ -49,6 +48,7 @@
                             <p id="pinSearchStatus" class="hidden pin-search-status" role="status" aria-live="polite"></p>
                             <ul id="pinSearchResults" class="hidden pin-search-results" aria-label="Suchergebnisse"></ul>
                         </div>
+                        <div id="pinMap" class="pin-map" aria-label="Karte zur Auswahl des Treffpunkts"></div>
                     </div>
                     <p class="form-note">Die Suche sendet den Suchbegriff an Nominatim (OpenStreetMap). Danach den exakten Pin auf der Karte anklicken.</p>
                     <div class="pin-toolbar">
@@ -117,7 +117,8 @@
                 <button id="resetUsersFilters" type="button" class="logout-btn">Filter zurücksetzen</button>
             </form>
             <p id="usersMessage" class="form-note" role="status" aria-live="polite">Lade User …</p>
-            <div class="admin-table-wrap">
+            <p class="form-note admin-scroll-hint">Tabelle seitlich wischen, um alle Spalten zu sehen.</p>
+            <div class="admin-table-wrap" tabindex="0" aria-label="User-Tabelle horizontal scrollen">
                 <table class="admin-users-table">
                     <thead><tr>
                         <th scope="col">User <button type="button" class="column-help" data-help="username" aria-label="Erklärung zu User anzeigen" aria-expanded="false" aria-controls="columnHelpTooltip">?</button></th>
