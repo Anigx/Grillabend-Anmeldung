@@ -70,7 +70,7 @@ document.addEventListener('DOMContentLoaded', () => {
     window.addEventListener('scroll', closeHelp, true);
     window.addEventListener('resize', closeHelp);
 
-    const tabs = [el('eventTab'), el('usersTab')];
+    const tabs = [el('eventTab'), el('usersTab'), el('resetTab')];
     function selectTab(tab, focus = false) {
         for (const choice of tabs) {
             const selected = choice === tab;
@@ -79,11 +79,9 @@ document.addEventListener('DOMContentLoaded', () => {
             el(choice.getAttribute('aria-controls')).classList.toggle('hidden', !selected);
         }
         if (focus) tab.focus();
-        if (tab === el('eventTab')) {
-            setExportOpen(false);
-            window.requestAnimationFrame(() => map.invalidateSize());
-        }
-        else loadUsers();
+        if (tab !== el('usersTab')) setExportOpen(false);
+        if (tab === el('eventTab')) window.requestAnimationFrame(() => map.invalidateSize());
+        if (tab === el('usersTab')) loadUsers();
     }
 
     for (const tab of tabs) {
@@ -96,6 +94,71 @@ document.addEventListener('DOMContentLoaded', () => {
             if (target) { event.preventDefault(); selectTab(target, true); }
         });
     }
+
+    const resetDialog = el('resetDialog');
+    let resetBusy = false;
+    let resetNoticeTimer = null;
+    function openResetDialog() {
+        window.clearTimeout(resetNoticeTimer);
+        el('resetMessage').textContent = '';
+        el('resetMessage').className = 'hidden message admin-reset-status';
+        el('resetDialogError').textContent = '';
+        el('resetDialogError').classList.add('hidden');
+        resetDialog.showModal();
+        el('resetPassword').focus();
+    }
+    el('openResetDialog').addEventListener('click', openResetDialog);
+    el('cancelReset').addEventListener('click', () => resetDialog.close());
+    resetDialog.addEventListener('cancel', event => { if (resetBusy) event.preventDefault(); });
+    resetDialog.addEventListener('close', () => {
+        el('resetForm').reset();
+        el('resetDialogError').textContent = '';
+        el('resetDialogError').classList.add('hidden');
+        el('openResetDialog').focus();
+    });
+    el('resetForm').addEventListener('submit', async event => {
+        event.preventDefault();
+        if (resetBusy) return;
+        resetBusy = true;
+        el('confirmReset').disabled = true;
+        el('cancelReset').disabled = true;
+        try {
+            const response = await fetch('/api/admin/reset-rsvps', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password: el('resetPassword').value })
+            });
+            const result = await response.json();
+            if (response.status === 401 || response.status === 403) {
+                window.location.assign('/');
+                return;
+            }
+            if (!response.ok) throw new Error(result.error || 'Zurücksetzen fehlgeschlagen.');
+            resetDialog.close();
+            const status = el('resetMessage');
+            status.textContent = `${new Intl.NumberFormat('de-DE').format(result.deleted)} Antwort${result.deleted === 1 ? '' : 'en'} zurückgesetzt. Alle User können sich erneut eintragen.`;
+            status.className = 'message success admin-reset-status';
+            window.clearTimeout(resetNoticeTimer);
+            resetNoticeTimer = window.setTimeout(() => {
+                status.textContent = '';
+                status.className = 'hidden message admin-reset-status';
+                resetNoticeTimer = null;
+            }, 5000);
+            users = [];
+            request('GET').then(party => {
+                el('usedCabin').textContent = `${party.occupancy.cabin}/${party.max_cabin_capacity}`;
+                el('usedBedding').textContent = `${party.occupancy.bedding}/${party.max_bettgarnitur}`;
+            }).catch(error => message(error.message));
+        } catch (error) {
+            el('resetPassword').value = '';
+            el('resetDialogError').textContent = error.message;
+            el('resetDialogError').classList.remove('hidden');
+            el('resetPassword').focus();
+        } finally {
+            resetBusy = false;
+            el('confirmReset').disabled = false;
+            el('cancelReset').disabled = false;
+        }
+    });
 
     let users = [];
     let filteredUsers = [];

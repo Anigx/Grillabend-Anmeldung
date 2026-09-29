@@ -6,6 +6,10 @@ Frühere Einträge nennen die damaligen Dateipfade; die aktuelle Struktur steht 
 
 ## 2026-09-29
 
+- Der Tab „Neuer Grillabend“ zeigt zunächst nur Erklärung und Button; der Warn-Dialog öffnet erst durch einen Klick auf „Alle Antworten zurücksetzen“. Abstand über dem Button ergänzt (`public/admin.html`, `public/js/admin.js`, `public/css/admin.css`, [[features/administration]], [[design/erscheinungsbild]]).
+- Den Warn- und Passwortdialog für den Admin-Reset explizit im Sichtfeld zentriert; der globale CSS-Reset hatte die Browser-Zentrierung des nativen Dialogs überschrieben (`public/css/admin.css`, [[design/erscheinungsbild]]).
+- Die Erfolgsmeldung nach dem Admin-Reset als fünf Sekunden sichtbaren Hinweis mittig im Sichtfeld umgesetzt (`public/admin.html`, `public/css/admin.css`, `public/js/admin.js`, [[features/administration]], [[design/erscheinungsbild]]).
+- Admin-Tab „Neuer Grillabend“ mit Warn-Modal und Passwortbestätigung ergänzt; der Admin-geschützte Endpunkt löscht nur bisherige Antworten und lässt Konten, Sitzungen und Veranstaltungsdaten bestehen. Rechte-, Passwort- und Reset-Tests ergänzt (`public/admin.html`, `public/js/admin.js`, `public/css/admin.css`, `src/server.js`, `test/app.test.js`, [[features/administration]], [[api/http-endpunkte]], [[daten/sqlite]]).
 - Im Adminformular das Disketten-Symbol vom Speichern-Button entfernt und die Rückmeldung unter den Button gesetzt; „Änderungen gespeichert.“ verschwindet nach drei Sekunden oder bei erneuter Eingabe, ohne neue Hinweise oder Fehler auszublenden (`public/admin.html`, `public/js/admin.js`, [[features/administration]], [[design/erscheinungsbild]]).
 - Die zusätzliche Karte um „Passwort wiederholen“ entfernt; beide Passwortfelder verwenden wieder dieselbe Formular-Gestaltung, während die Passwortstärke ihre eigene Karte behält (`public/index.html`, `public/css/style.css`, [[design/erscheinungsbild]]).
 - Die Passwortstärke in eine eigene dunkle Karte unterhalb der separaten Karte für „Passwort wiederholen“ gesetzt und die Abstände angepasst (`public/index.html`, `public/css/style.css`, [[design/erscheinungsbild]]).

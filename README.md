@@ -10,6 +10,8 @@ Admin-Konten erreichen den eigenen Bereich über den Link auf der Teilnehmerseit
 
 Im Tab „User-Übersicht“ können Admins Konten und Antworten nach Name, Teilnahme, Hüttenschlaf und Bettgarnitur filtern. Die sichtbare Auswahl lässt sich als Excel (`.xlsx`), CSV (`.csv`), PDF (`.pdf`) oder Bild (`.png`; bei sehr vielen Zeilen mehrere PNGs in einer ZIP-Datei) exportieren. Die Dateien werden lokal im Browser aus den Admin-Daten erstellt.
 
+Im Tab „Neuer Grillabend“ öffnet der Button „Alle Antworten zurücksetzen“ ein Warn-Modal zum Zurücksetzen aller bisherigen Teilnahmeantworten einschließlich Hüttenschlaf und Bettgarnitur. Erst nach erneuter Eingabe des eigenen Admin-Passworts werden die Antworten gelöscht. Konten, Passwörter, Sitzungen und Veranstaltungsdaten bleiben bestehen; Datum, Ort und weitere Angaben können im Tab „Veranstaltung“ für den neuen Grillabend bearbeitet werden. Der Vorgang ist nicht rückgängig zu machen.
+
 ## Projektstruktur
 
 - `server.js`: kleiner Startpunkt; `src/server.js`: HTTP-Routen, Sitzungen und Kapazitätslogik.

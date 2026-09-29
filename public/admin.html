@@ -21,12 +21,13 @@
                 <h1>⚙️ Adminbereich</h1>
                 <p>Veranstaltung, Plätze und Hinweise an einem Ort verwalten.</p>
             </div>
-            <a class="logout-btn" href="/">← Zur Teilnehmerseite</a>
+            <a class="logout-btn" href="/">Zur Teilnehmerseite</a>
         </header>
 
         <div class="admin-tabs" role="tablist" aria-label="Adminbereiche">
             <button id="eventTab" class="admin-tab" type="button" role="tab" aria-selected="true" aria-controls="eventPanel">Veranstaltung</button>
             <button id="usersTab" class="admin-tab" type="button" role="tab" aria-selected="false" aria-controls="usersPanel" tabindex="-1">User-Übersicht</button>
+            <button id="resetTab" class="admin-tab" type="button" role="tab" aria-selected="false" aria-controls="resetPanel" tabindex="-1">Neuer Grillabend</button>
         </div>
 
         <div id="eventPanel" class="admin-grid" role="tabpanel" aria-labelledby="eventTab">
@@ -129,7 +130,29 @@
                 </table>
             </div>
         </section>
+        <section id="resetPanel" class="admin-panel hidden" role="tabpanel" aria-labelledby="resetTab">
+            <h2>Neuer Grillabend</h2>
+            <p>Setze die Teilnahmeantworten aller User zurück, damit sie sich für den nächsten Grillabend erneut eintragen können. Benutzerkonten und Passwörter bleiben erhalten.</p>
+            <p class="form-note">Datum, Ort, Regeln und Kapazitäten kannst du danach im Tab „Veranstaltung“ bearbeiten.</p>
+            <button id="openResetDialog" type="button" class="delete-btn admin-reset-action">Alle Antworten zurücksetzen</button>
+        </section>
     </main>
+    <dialog id="resetDialog" class="reset-dialog" aria-labelledby="resetDialogTitle" aria-describedby="resetDialogWarning">
+        <form id="resetForm">
+            <h2 id="resetDialogTitle">Alle Antworten zurücksetzen?</h2>
+            <p id="resetDialogWarning" class="reset-warning"><strong>Achtung: Alle bisherigen Teilnahmeantworten werden unwiderruflich gelöscht.</strong> Auch Angaben zu Hüttenschlaf und Bettgarnitur gehen verloren. Alle User müssen für den nächsten Grillabend erneut antworten. Benutzerkonten und Passwörter bleiben erhalten.</p>
+            <div class="form-group">
+                <label for="resetPassword">Admin-Passwort zur Bestätigung</label>
+                <input id="resetPassword" name="password" type="password" autocomplete="current-password" aria-describedby="resetDialogError" required>
+            </div>
+            <p id="resetDialogError" class="hidden message error" role="alert"></p>
+            <div class="reset-actions">
+                <button id="cancelReset" type="button" class="logout-btn">Abbrechen</button>
+                <button id="confirmReset" type="submit" class="delete-btn">Alle Antworten zurücksetzen</button>
+            </div>
+        </form>
+    </dialog>
+    <p id="resetMessage" class="hidden message admin-reset-status" role="status" aria-live="polite"></p>
     <div id="columnHelpTooltip" class="hidden column-help-tooltip" role="tooltip"></div>
     <p id="exportMessage" class="hidden message admin-export-status" role="status" aria-live="polite"></p>
 </body>

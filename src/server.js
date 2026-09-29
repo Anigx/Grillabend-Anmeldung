@@ -265,6 +265,22 @@ async function createApp(options = {}) {
         } catch (error) { next(error); }
     });
 
+    app.post('/api/admin/reset-rsvps', requireUser, requireAdmin, authLimit, async (req, res, next) => {
+        try {
+            const password = req.body?.password;
+            if (typeof password !== 'string' || !password) {
+                return res.status(400).json({ error: 'Bitte Admin-Passwort eingeben.' });
+            }
+            const result = await exclusive(async () => {
+                const admin = await db.get('SELECT password_hash FROM users WHERE id = ? AND is_admin = 1', [req.user.id]);
+                if (!admin || !(await verifyPassword(password, admin.password_hash))) return null;
+                return db.run('DELETE FROM rsvps');
+            });
+            if (!result) return res.status(422).json({ error: 'Admin-Passwort falsch. Bitte erneut eingeben.' });
+            res.json({ success: true, deleted: result.changes });
+        } catch (error) { next(error); }
+    });
+
     app.put('/api/admin/party-info', requireUser, requireAdmin, async (req, res, next) => {
         try {
             const fields = ['date', 'location_name', 'location_address', 'maps_url', 'rules', 'info'];

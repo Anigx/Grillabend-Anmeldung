@@ -14,6 +14,8 @@ Die Tabelle `sessions` hat einen Index auf `expires_at`. Abgelaufene Einträge w
 
 Die Admin-Userübersicht verbindet `users` und `rsvps` lesend über den Benutzernamen (ohne Beachtung der Groß-/Kleinschreibung). So bleiben auch Konten ohne RSVP sichtbar; es wird dafür keine zusätzliche Tabelle oder Spalte angelegt. Siehe [[features/administration]].
 
+Der Admin-Reset für einen neuen Grillabend leert ausschließlich `rsvps`, nach Prüfung des aktuellen Admin-Passworts. `users`, `sessions`, `party_info` und `metadata` bleiben erhalten. Buchungen und Kapazitätsänderungen laufen in derselben Schreibwarteschlange wie der Reset (`src/server.js`); danach sind alle bisherigen Belegungen wieder null und User können erneut antworten.
+
 Beim ersten Start sucht `src/db.js` nach `accounts.sqlite` (`users`), `party_eintraege.sqlite` (`rsvps`) und `Datum.sqlite` (`party_info`) **im Projektordner oberhalb von `src/`**. Vorhandene Dateien werden **nur lesend** geöffnet. Der Import läuft in einer Transaktion; importierte Klartextpasswörter werden vor dem Speichern gehasht. Ein Kennzeichen verhindert den erneuten Import. Bei vorhandenen Benutzern/RSVPs in der neuen Datenbank wird ein noch ausstehender Alt-Import abgebrochen, statt Datensätze still zu überschreiben. Fehlende alte Tabellen sind zulässig. Nach dem Abgleich vom 2026-09-29 liegen die drei Altdateien nicht mehr im Projektordner; der Importcode bleibt für Wiederherstellungen und andere Installationen erhalten.
 
 Fehlt bei einem Alt-Konto ein gültiges Passwort, bricht die Übernahme mit Rollback ab, statt aus einem fehlenden Wert ein erratbares neues Passwort zu erzeugen (`src/db.js`, `test/app.test.js`).

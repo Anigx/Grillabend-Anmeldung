@@ -15,6 +15,7 @@ Bei `NODE_ENV=production` lehnt die Anwendung **jede** über den lokalen Nginx-U
 | `GET /api/party-info` | ja | Veranstaltungsdaten einschließlich Regeln, Informationen und optionalem Pin (`latitude`, `longitude`) liefern |
 | `GET /api/admin/party-info` | Admin | editierbare Daten, optionalen Pin und `occupancy` (`cabin`, `bedding`) abrufen |
 | `GET /api/admin/users` | Admin | registrierte Konten mit `username` und ggf. `kommt`, `huette`, `bettgarnitur`, `updated_at` aus ihrer Antwort abrufen; ohne Antwort sind diese vier Felder `null` |
+| `POST /api/admin/reset-rsvps` | Admin | `{ password }` prüft das aktuelle Passwort des angemeldeten Admins; bei Erfolg alle bisherigen Antworten löschen und `{ success: true, deleted: Anzahl }` liefern; bei falschem Passwort `422`, ohne Passwort `400`, nach zu vielen Auth-Versuchen `429` |
 | `PUT /api/admin/party-info` | Admin | `{ date, location_name, location_address, maps_url, latitude, longitude, max_cabin_capacity, max_bettgarnitur, rules, info }` validieren und speichern; aktualisierte Daten samt `occupancy` zurückgeben |
 | `GET /api/attendees` | ja | Teilnehmerliste und Antworten liefern |
 | `POST /api/rsvp` | ja | eigene Antwort mit `{ kommt, huette, bettgarnitur }` speichern, Grenzen prüfen |

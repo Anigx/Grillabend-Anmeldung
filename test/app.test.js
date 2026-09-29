@@ -166,6 +166,54 @@ test('Admin-Userübersicht zeigt alle Konten mit Antworten, aber ohne Zugangsdat
     } finally { await app.close(); }
 });
 
+test('Neuer Grillabend setzt nur Antworten nach erneuter Admin-Passwortprüfung zurück', async () => {
+    process.env.ADMIN_USERNAME = 'Organisator';
+    process.env.ADMIN_PASSWORD = 'ein-sicheres-Beispielpasswort';
+    let app;
+    try { app = await instance(); }
+    finally { delete process.env.ADMIN_USERNAME; delete process.env.ADMIN_PASSWORD; }
+    try {
+        const admin = await app.request('/api/login', 'POST', { username: 'Organisator', password: 'ein-sicheres-Beispielpasswort' });
+        const guest = await app.request('/api/register', 'POST', { username: 'Mara', password: 'ein-lang-genuges-Testpasswort1' });
+        const other = await app.request('/api/register', 'POST', { username: 'Nina', password: 'ein-lang-genuges-Testpasswort2' });
+        const party = {
+            date: 'Samstag', location_name: 'Hütte', location_address: 'Berlin', maps_url: '',
+            max_cabin_capacity: 2, max_bettgarnitur: 1, rules: 'Regeln', info: 'Informationen'
+        };
+        assert.equal((await app.request('/api/admin/party-info', 'PUT', party, admin.cookie)).status, 200);
+        assert.equal((await app.request('/api/rsvp', 'POST', { kommt: 'Ja', huette: 'Ja', bettgarnitur: 'Ja' }, guest.cookie)).status, 200);
+        assert.equal((await app.request('/api/rsvp', 'POST', { kommt: 'Nein', huette: 'Nein', bettgarnitur: 'Nein' }, other.cookie)).status, 200);
+        const page = await fetch(`${app.base}/admin`, { headers: { Cookie: admin.cookie } });
+        const html = await page.text();
+        assert.match(html, /id="resetTab"/);
+        assert.match(html, /id="resetDialog"/);
+        assert.match(html, /id="resetPassword" name="password" type="password"/);
+        const route = '/api/admin/reset-rsvps';
+        const correct = { password: 'ein-sicheres-Beispielpasswort' };
+        assert.equal((await app.request(route, 'POST', correct)).status, 401);
+        assert.equal((await app.request(route, 'POST', correct, guest.cookie)).status, 403);
+        assert.equal((await app.request(route, 'POST', correct, admin.cookie, 'https://fremd.example')).status, 403);
+        assert.equal((await app.request(route, 'POST', {}, admin.cookie)).status, 400);
+        assert.equal((await app.request(route, 'POST', { password: 'falsch' }, admin.cookie)).status, 422);
+        assert.equal((await app.request('/api/attendees', 'GET', null, guest.cookie)).data.length, 2);
+        const reset = await app.request(route, 'POST', correct, admin.cookie);
+        assert.deepEqual(reset.data, { success: true, deleted: 2 });
+        assert.equal(reset.cacheControl, 'no-store');
+        assert.deepEqual((await app.request('/api/attendees', 'GET', null, guest.cookie)).data, []);
+        const people = (await app.request('/api/admin/users', 'GET', null, admin.cookie)).data;
+        assert.deepEqual(people.map(person => person.username), ['Mara', 'Nina', 'Organisator']);
+        assert.ok(people.every(person => person.kommt === null && person.huette === null && person.bettgarnitur === null && person.updated_at === null));
+        const info = (await app.request('/api/admin/party-info', 'GET', null, admin.cookie)).data;
+        assert.equal(info.date, party.date);
+        assert.equal(info.rules, party.rules);
+        assert.deepEqual(info.occupancy, { cabin: 0, bedding: 0 });
+        assert.equal((await app.request('/api/session', 'GET', null, guest.cookie)).data.username, 'Mara');
+        assert.equal((await app.request('/api/login', 'POST', { username: 'Nina', password: 'ein-lang-genuges-Testpasswort2' })).status, 200);
+        assert.deepEqual((await app.request(route, 'POST', correct, admin.cookie)).data, { success: true, deleted: 0 });
+        assert.equal((await app.request('/api/rsvp', 'POST', { kommt: 'Ja', huette: 'Ja', bettgarnitur: 'Ja' }, guest.cookie)).status, 200);
+    } finally { await app.close(); }
+});
+
 test('Neustart mit geändertem Admin-Passwort rotiert den Hash und widerruft nur Admin-Sitzungen', async () => {
     const dataRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'grillabend-rotation-'));
     const previousName = process.env.ADMIN_USERNAME;
