@@ -69,7 +69,7 @@ docker compose up -d
 docker compose logs -f grillabend
 ```
 
-`compose.yaml` verwendet das **bestehende oder neu angelegte** Docker-Volume `grillabend-data`. Bestehende `data/app.sqlite` nicht durch einen Start mit leerem Volume ersetzen: die Datenbank bei gestopptem Server in das Volume übernehmen und die Schreibrechte für UID 1000 sicherstellen. `docker compose down` lässt das Volume bestehen; `docker compose down -v` würde es löschen. Nginx und seine Zertifikate werden auf dem Host eingerichtet, nicht durch Compose gestartet. Ein lokaler Docker-/Compose-Lauf und die reale Nginx-Anbindung sind hier nicht getestet.
+`compose.yaml` verwendet das **bestehende oder neu angelegte** Docker-Volume `grillabend-data`. Bestehende `data/app.sqlite` nicht durch einen Start mit leerem Volume ersetzen: die Datenbank bei gestopptem Server in das Volume übernehmen und die Schreibrechte für UID 1000 sicherstellen. `docker compose down` lässt das Volume bestehen; `docker compose down -v` würde es löschen. Nginx und seine Zertifikate werden auf dem Host eingerichtet, nicht durch Compose gestartet. Der GitHub-VM-Test prüft Compose mit einem lokalen Nginx-Proxy und temporärem HTTPS-Tunnel; eine echte Installation mit produktivem Zertifikat bleibt separat zu prüfen.
 
 ```sh
 docker volume create grillabend-data
