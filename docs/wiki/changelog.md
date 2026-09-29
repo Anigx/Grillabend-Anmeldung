@@ -6,6 +6,7 @@ Frühere Einträge nennen die damaligen Dateipfade; die aktuelle Struktur steht 
 
 ## 2026-09-29
 
+- Nach dem ersten fehlgeschlagenen Container-Smoke-Test die sofortige Entfernung des Testcontainers deaktiviert und seine Startlogs im immer ausgeführten Cleanup sichtbar gemacht. Test und Image-Build liefen im ersten GitHub-Lauf erfolgreich; die Ursache des nicht erreichbaren Testcontainers ist damit noch nicht behauptet (`.github/workflows/docker.yml`, [[entwicklung/lokal-starten]]).
 - Den vom Projektverantwortlichen ergänzten Listener im Entwicklungsmodus auf `0.0.0.0` für Zugriff aus dem lokalen Netzwerk in diesen Commit übernommen; die Produktionsbindung an Loopback und HTTPS-Proxy bleibt bestehen. Startmeldung und Betriebsdokumentation an die tatsächliche Bindung angepasst (`server.js`, `README.md`, [[architektur/ueberblick]], [[entwicklung/lokal-starten]], [[entscheidungen/neuaufbau]]).
 - Das Einstellungs-Zahnrad im Nutzerkopf unmittelbar links vor den Benutzernamen gesetzt; Aussehen und Dialogverhalten bleiben erhalten (`public/index.html`, [[design/erscheinungsbild]], [[features/anmeldung-und-teilnahme]]).
 - Auf Wunsch auch **alle vorhandenen** Konten einmalig auf sichtbare Namen umgestellt; neue Datenbanken und Alt-Importe starten ebenfalls sichtbar. Die transaktionale `metadata.names_visible_once`-Migration lässt spätere Opt-outs beim Neustart bestehen; Tests mit künstlichen Bestandsdaten ergänzt (`src/db.js`, `test/app.test.js`, [[daten/sqlite]], [[features/anmeldung-und-teilnahme]], [[entscheidungen/neuaufbau]]).

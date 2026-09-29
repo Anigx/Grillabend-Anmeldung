@@ -39,7 +39,7 @@ jobs:
       - name: Containerstart und HTTPS-Proxy-Prüfung
         shell: bash
         run: |
-          docker run -d --rm --name grillabend-smoke --network host \
+          docker run -d --name grillabend-smoke --network host \
             --tmpfs /app/data:rw,uid=1000,gid=1000 \
             -e APP_ORIGIN=https://example.invalid grillabend:smoke
           curl --retry 15 --retry-delay 1 --retry-connrefused -fsS -o /dev/null \
@@ -52,7 +52,9 @@ jobs:
             --data '{"username":"SmokeUser","password":"Synthetisches-Passwort123!"}'
       - name: Testcontainer entfernen
         if: always()
-        run: docker rm -f grillabend-smoke || true
+        run: |
+          docker logs grillabend-smoke || true
+          docker rm -f grillabend-smoke || true
 
   publish:
     needs: build
