@@ -1,0 +1,18 @@
+services:
+  grillabend:
+    image: ${GRILLABEND_IMAGE:-ghcr.io/anigx/cloud-erazy-project:latest}
+    restart: unless-stopped
+    network_mode: host
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      PORT: "621"
+      DATA_DIR: /app/data
+      APP_ORIGIN: ${APP_ORIGIN:?APP_ORIGIN in .env als HTTPS-Origin eintragen}
+    volumes:
+      - grillabend-data:/app/data
+
+volumes:
+  grillabend-data:
+    name: grillabend-data

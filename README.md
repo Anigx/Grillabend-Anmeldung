@@ -30,7 +30,7 @@ Beim ersten Start wird `data/app.sqlite` angelegt. Liegen die drei älteren SQLi
 
 ## Admin einrichten
 
-Bei vorhandenen Alt-Daten bleiben Adminrechte aus `accounts.sqlite` erhalten. Für einen frischen Start beide Umgebungsvariablen `ADMIN_USERNAME` und `ADMIN_PASSWORD` vor dem ersten `npm start` setzen (mindestens zwölf Zeichen für das Passwort). Der Server legt damit ein Admin-Konto an; die **erste öffentliche Registrierung erhält keine Adminrechte**. Geheimnisse niemals in Dateien oder Wiki eintragen. Sind die Variablen beim Start nicht gesetzt, ist Registrierung möglich, aber der Adminbereich erst nach Einrichtung eines Administrators verfügbar.
+Bei vorhandenen Alt-Daten bleiben Adminrechte aus `accounts.sqlite` erhalten. Für einen frischen Start beide Umgebungsvariablen `ADMIN_USERNAME` und `ADMIN_PASSWORD` vor dem ersten `npm start` setzen (mindestens zwölf Zeichen für das Passwort). Der Server legt damit ein Admin-Konto an; die **erste öffentliche Registrierung erhält keine Adminrechte**. Geheimnisse niemals in versionierte Dateien oder ins Wiki eintragen; für Docker Compose die private, von Git ausgeschlossene `.env` verwenden. Sind die Variablen beim Start nicht gesetzt, ist Registrierung möglich, aber der Adminbereich erst nach Einrichtung eines Administrators verfügbar.
 
 Bei einem bereits vorhandenen Admin-Konto mit diesem Namen prüft der Start das konfigurierte Passwort gegen den gespeicherten Hash. Weicht es ab, wird das Admin-Passwort geändert und **alle bisherigen Sitzungen dieses Admin-Kontos werden ungültig**. Bei unverändertem Passwort bleiben sie gültig; Sitzungen anderer Konten bleiben bei der Rotation erhalten. Zum Wechsel des Admin-Passworts den neuen Wert von `ADMIN_PASSWORD` konfigurieren und den Node-Prozess neu starten. Ist `ADMIN_PASSWORD` später nicht gesetzt, erfolgt keine Rotation. Bei einem vorhandenen Nicht-Admin-Konto mit demselben Namen bricht der Start weiterhin ab.
 
@@ -61,6 +61,16 @@ Das `Dockerfile` erstellt ein Node-22-Produktionsimage auf Debian Trixie slim (a
 
 Für die vorhandene Nginx-Vorlage auf einem **Linux-Host** den Container im Host-Netzwerk starten: Node bleibt dadurch auf `127.0.0.1:621` erreichbar, und Express vertraut weiterhin nur dem lokalen Proxy. Ein normaler Docker-Port-Forward (`-p`) funktioniert mit diesem Loopback-Listener nicht. Der Host muss Port 621 intern halten; nur Nginx stellt HTTPS öffentlich bereit.
 
+Mit `compose.yaml` lässt sich das veröffentlichte Image starten. Die versionierte `.env.example` enthält alle Angaben und Beispiele **auskommentiert mit deutschen Erklärungen**; `.env` ist die lokale, von Git und Docker-Build ausgeschlossene Kopie. Bei einer frischen Installation `.env.example` nach `.env` kopieren (z. B. `cp .env.example .env`), in `.env` mindestens `APP_ORIGIN=https://<öffentliche-domain>` ohne abschließenden Slash aktivieren und bei einer neuen Installation `ADMIN_USERNAME` und `ADMIN_PASSWORD` **zusammen** ausfüllen. Die echte Domain muss zu `deploy/nginx.conf.example` passen; ohne aktives `APP_ORIGIN` verweigert Compose den Start. Das Image, `NODE_ENV=production`, Port `621` und der Datenpfad `/app/data` haben feste Standardwerte; nur `GRILLABEND_IMAGE` kann über `.env` ein anderes bereits vorhandenes Image auswählen. Auf dem Linux-Host:
+
+```sh
+docker compose pull
+docker compose up -d
+docker compose logs -f grillabend
+```
+
+`compose.yaml` verwendet das **bestehende oder neu angelegte** Docker-Volume `grillabend-data`. Bestehende `data/app.sqlite` nicht durch einen Start mit leerem Volume ersetzen: die Datenbank bei gestopptem Server in das Volume übernehmen und die Schreibrechte für UID 1000 sicherstellen. `docker compose down` lässt das Volume bestehen; `docker compose down -v` würde es löschen. Nginx und seine Zertifikate werden auf dem Host eingerichtet, nicht durch Compose gestartet. Ein lokaler Docker-/Compose-Lauf und die reale Nginx-Anbindung sind hier nicht getestet.
+
 ```sh
 docker volume create grillabend-data
 docker run -d --name grillabend --restart unless-stopped --network host \
@@ -69,7 +79,7 @@ docker run -d --name grillabend --restart unless-stopped --network host \
   ghcr.io/<owner>/<repo>:latest
 ```
 
-Die private Env-Datei muss `APP_ORIGIN=https://<oeffentliche-domain>` enthalten, passend zum von Nginx durchgereichten `Host`; für die erstmalige Einrichtung eines Admins außerdem `ADMIN_USERNAME` und `ADMIN_PASSWORD` gemeinsam (Passwort mindestens zwölf Zeichen). `NODE_ENV=production`, `PORT=621` und `DATA_DIR=/app/data` sind bereits im Image gesetzt. Nginx wie in `deploy/nginx.conf.example` auf demselben Host betreiben und die Domain sowie Zertifikatspfade dort ersetzen. Weder Env-Datei noch Zertifikate ins Repository legen.
+Die private Env-Datei für den manuellen Start muss `APP_ORIGIN=https://<oeffentliche-domain>` enthalten, passend zum von Nginx durchgereichten `Host`; für die erstmalige Einrichtung eines Admins außerdem `ADMIN_USERNAME` und `ADMIN_PASSWORD` gemeinsam (Passwort mindestens zwölf Zeichen). `NODE_ENV=production`, `PORT=621` und `DATA_DIR=/app/data` sind bereits im Image gesetzt. Nginx wie in `deploy/nginx.conf.example` auf demselben Host betreiben und die Domain sowie Zertifikatspfade dort ersetzen. Weder die ausgefüllte `.env` noch Zertifikate ins Repository legen; nur die auskommentierte `.env.example` wird versioniert.
 
 Das Volume enthält `app.sqlite` und muss bei einem Container-Update wieder eingebunden werden. Bei einem Umzug die vorhandene Datenbank **bei gestopptem Server** in das Volume übertragen und sicherstellen, dass der Containerbenutzer `node` (UID 1000) sie und das Verzeichnis schreiben kann; sonst beginnt die App mit einer neuen, leeren Datenbank. Datenbank und Volume separat sichern.
 
