@@ -3,6 +3,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let user = null;
     let party = null;
     let attendees = [];
+    let authMode = 'login';
 
     async function api(path, options = {}) {
         const response = await fetch(`/api/${path}`, {
@@ -25,14 +26,77 @@ document.addEventListener('DOMContentLoaded', () => {
         target.className = text ? `message ${type}` : 'hidden message';
     }
 
+    function updatePasswordFeedback() {
+        const password = el('password');
+        const value = password.value;
+        const checks = [
+            ['requireLength', value.length >= 12],
+            ['requireUpper', /\p{Lu}/u.test(value)],
+            ['requireLower', /\p{Ll}/u.test(value)],
+            ['requireNumber', /\p{Nd}/u.test(value)],
+            ['requireSpecial', /[^\p{L}\p{N}\s]/u.test(value)]
+        ];
+        let fulfilled = 0;
+        for (const [id, met] of checks) {
+            el(id).classList.toggle('is-met', met);
+            if (met) fulfilled++;
+        }
+        const level = !value ? 'empty' : fulfilled === 5 ? 'strong' : fulfilled >= 3 ? 'medium' : 'weak';
+        const label = { empty: 'Noch kein Passwort', weak: 'Schwach', medium: 'Mittel', strong: 'Stark' }[level];
+        el('passwordStrength').textContent = `Passwortstärke: ${label}`;
+        el('strengthFill').style.width = `${fulfilled * 20}%`;
+        el('strengthFill').dataset.level = level;
+        password.setCustomValidity(authMode === 'register' && value && fulfilled !== 5
+            ? 'Das Passwort benötigt mindestens 12 Zeichen, Groß- und Kleinbuchstaben, eine Zahl und ein Sonderzeichen.' : '');
+        updateConfirmation();
+    }
+
+    function updateConfirmation() {
+        const confirmation = el('confirmPassword');
+        const mismatch = authMode === 'register' && Boolean(confirmation.value) && confirmation.value !== el('password').value;
+        confirmation.setCustomValidity(mismatch ? 'Die Passwörter stimmen nicht überein.' : '');
+        const hint = el('confirmHint');
+        hint.textContent = !confirmation.value ? '' : mismatch
+            ? 'Die Passwörter stimmen nicht überein.' : 'Die Passwörter stimmen überein.';
+        hint.classList.toggle('hidden', !confirmation.value);
+        hint.classList.toggle('is-error', mismatch);
+        hint.classList.toggle('is-success', Boolean(confirmation.value) && !mismatch);
+    }
+
+    function setAuthMode(mode) {
+        if (authMode !== mode) {
+            el('password').value = '';
+            el('confirmPassword').value = '';
+        }
+        authMode = mode;
+        const registering = mode === 'register';
+        el('loginModeBtn').setAttribute('aria-pressed', String(!registering));
+        el('registerModeBtn').setAttribute('aria-pressed', String(registering));
+        el('authTitle').textContent = registering ? 'Schön, dass du dabei bist' : 'Willkommen zurück';
+        el('authDescription').textContent = registering
+            ? 'Erstelle ein Konto, um deine Teilnahme einzutragen.'
+            : 'Mit deinem Konto kannst du deine Rückmeldung verwalten.';
+        el('authSubmitBtn').textContent = registering ? 'Konto erstellen' : 'Anmelden';
+        el('registrationFields').classList.toggle('hidden', !registering);
+        el('password').autocomplete = registering ? 'new-password' : 'current-password';
+        el('password').minLength = registering ? 12 : 0;
+        if (registering) el('password').setAttribute('aria-describedby', 'passwordStrength');
+        else el('password').removeAttribute('aria-describedby');
+        el('confirmPassword').disabled = !registering;
+        el('confirmPassword').required = registering;
+        updatePasswordFeedback();
+        message('authMessage', '');
+    }
+
     function showApp() {
         el('authContainer').classList.toggle('hidden', Boolean(user));
         el('rsvpContainer').classList.toggle('hidden', !user);
+        document.title = user ? 'Grillabend – Deine Rückmeldung' : 'Grillabend – Anmeldung';
         if (!user) {
             el('deleteModal').classList.add('hidden');
             return;
         }
-        el('loggedInUser').textContent = `👤 ${user.username}`;
+        el('loggedInUser').textContent = user.username;
         el('adminBtn').classList.toggle('hidden', !user.is_admin);
     }
 
@@ -125,7 +189,7 @@ document.addEventListener('DOMContentLoaded', () => {
         el('count_bettgarnitur').textContent = `${attendees.filter(row => row.kommt === 'Ja' && row.huette === 'Ja' && row.bettgarnitur === 'Ja').length}/${party.max_bettgarnitur}`;
         const existing = attendees.find(row => row.username === user.username);
         el('deleteBtn').classList.toggle('hidden', !existing);
-        el('submitBtn').textContent = existing ? 'Eintrag ändern 📝' : 'Eintragen 🐾';
+        el('submitBtn').textContent = existing ? 'Änderungen speichern' : 'Antwort speichern';
         el('rsvpForm').reset();
         if (existing) {
             el(existing.kommt === 'Ja' ? 'kommt_ja' : existing.kommt === 'Nein' ? 'kommt_nein' : 'kommt_vielleicht').checked = true;
@@ -141,19 +205,36 @@ document.addEventListener('DOMContentLoaded', () => {
         showAttendees();
     }
 
-    async function authenticate(path) {
+    async function authenticate() {
+        if (authMode === 'register') updatePasswordFeedback();
         if (!el('authForm').reportValidity()) return;
+        const path = authMode;
+        const submit = el('authSubmitBtn');
+        submit.disabled = true;
+        el('loginModeBtn').disabled = true;
+        el('registerModeBtn').disabled = true;
+        submit.textContent = path === 'register' ? 'Konto wird erstellt…' : 'Anmeldung läuft…';
         try {
             user = await api(path, { method: 'POST', body: { username: el('username').value.trim(), password: el('password').value } });
             el('password').value = '';
+            el('confirmPassword').value = '';
             showApp();
             await reload();
             message('authMessage', '');
         } catch (error) { message(user ? 'rsvpMessage' : 'authMessage', error.message); }
+        finally {
+            submit.disabled = false;
+            el('loginModeBtn').disabled = false;
+            el('registerModeBtn').disabled = false;
+            submit.textContent = path === 'register' ? 'Konto erstellen' : 'Anmelden';
+        }
     }
 
-    el('authForm').addEventListener('submit', event => { event.preventDefault(); authenticate('login'); });
-    el('registerBtn').addEventListener('click', () => authenticate('register'));
+    el('authForm').addEventListener('submit', event => { event.preventDefault(); authenticate(); });
+    el('loginModeBtn').addEventListener('click', () => setAuthMode('login'));
+    el('registerModeBtn').addEventListener('click', () => setAuthMode('register'));
+    el('password').addEventListener('input', updatePasswordFeedback);
+    el('confirmPassword').addEventListener('input', updateConfirmation);
     el('logoutBtn').addEventListener('click', async () => {
         try {
             await api('logout', { method: 'POST' });
@@ -164,6 +245,9 @@ document.addEventListener('DOMContentLoaded', () => {
         party = null;
         attendees = [];
         el('mapFrame').removeAttribute('src');
+        el('password').value = '';
+        setAuthMode('login');
+        message('rsvpMessage', '');
         showApp();
     });
     document.querySelectorAll('input[name="kommt"], input[name="huette"]').forEach(input => input.addEventListener('change', updateChoices));

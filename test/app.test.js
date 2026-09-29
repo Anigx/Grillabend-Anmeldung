@@ -63,7 +63,7 @@ test('öffentliche Registrierung erstellt nur Mitglieder, Daten bleiben privat u
             assert.equal((await fetch(`${app.base}${asset}`)).status, 200, asset);
         }
         assert.equal((await fetch(`${app.base}/vendor/exceljs/package.json`)).status, 404);
-        const created = await app.request('/api/register', 'POST', { username: 'Testperson', password: 'ein-lang-genuges-Testpasswort' });
+        const created = await app.request('/api/register', 'POST', { username: 'Testperson', password: 'ein-lang-genuges-Testpasswort1' });
         assert.equal(created.status, 200);
         assert.equal(created.data.is_admin, false);
         assert.match(created.cookie, /^sid=[a-f0-9]{64}$/);
@@ -134,8 +134,8 @@ test('Admin-Userübersicht zeigt alle Konten mit Antworten, aber ohne Zugangsdat
     try {
         assert.equal((await app.request('/api/admin/users')).status, 401);
         const admin = await app.request('/api/login', 'POST', { username: 'Organisator', password: 'ein-sicheres-Beispielpasswort' });
-        const guest = await app.request('/api/register', 'POST', { username: 'Mara', password: 'ein-lang-genuges-Testpasswort' });
-        const noAnswer = await app.request('/api/register', 'POST', { username: 'Nina', password: 'ein-lang-genuges-Testpasswort' });
+        const guest = await app.request('/api/register', 'POST', { username: 'Mara', password: 'ein-lang-genuges-Testpasswort1' });
+        const noAnswer = await app.request('/api/register', 'POST', { username: 'Nina', password: 'ein-lang-genuges-Testpasswort1' });
         assert.equal((await app.request('/api/admin/users', 'GET', null, guest.cookie)).status, 403);
         assert.equal((await app.request('/api/admin/users', 'GET', null, noAnswer.cookie)).status, 403);
         const empty = await app.request('/api/admin/users', 'GET', null, admin.cookie);
@@ -179,7 +179,7 @@ test('Neustart mit geändertem Admin-Passwort rotiert den Hash und widerruft nur
         process.env.ADMIN_PASSWORD = firstPassword;
         app = await instance(dataRoot, { dataDir });
         const admin = await app.request('/api/login', 'POST', { username: 'Auditadmin', password: firstPassword });
-        const member = await app.request('/api/register', 'POST', { username: 'Mitglied', password: 'synthetisches-Mitgliedspasswort' });
+        const member = await app.request('/api/register', 'POST', { username: 'Mitglied', password: 'synthetisches-Mitgliedspasswort1' });
         assert.equal(admin.status, 200);
         assert.equal(member.status, 200);
         await app.close();
@@ -252,20 +252,29 @@ test('Registrierung prüft Namen und Passwort, erlaubt keine Admin-Selbstvergabe
     const app = await instance();
     try {
         for (const body of [
-            { username: '<script>', password: 'ein-laengeres-Testpasswort' },
-            { username: 'G', password: 'ein-laengeres-Testpasswort' },
+            { username: '<script>', password: 'ein-laengeres-Testpasswort1' },
+            { username: 'G', password: 'ein-laengeres-Testpasswort1' },
             { username: 'Guter Name', password: 'kurz' },
             { username: 'Guter Name', password: 12345 },
-            { username: 'X'.repeat(41), password: 'ein-laengeres-Testpasswort' }
+            { username: 'Guter Name', password: 'kleinbuchstaben1!' },
+            { username: 'Guter Name', password: 'GROSSBUCHSTABEN1!' },
+            { username: 'Guter Name', password: 'OhneZahl!LangesPasswort' },
+            { username: 'Guter Name', password: 'OhneSonderzeichen123' },
+            { username: 'Guter Name', password: 'Abcdefghij1 ' },
+            { username: 'X'.repeat(41), password: 'ein-laengeres-Testpasswort1' }
         ]) assert.equal((await app.request('/api/register', 'POST', body)).status, 400);
         assert.equal((await app.db.get('SELECT COUNT(*) AS count FROM users')).count, 0);
         const signed = await app.request('/api/register', 'POST', {
-            username: 'Gast', password: 'ein-laengeres-Testpasswort', is_admin: true
+            username: 'Gast', password: 'Aa123456789!', is_admin: true
         });
+        assert.equal(signed.status, 200);
         assert.equal(signed.data.is_admin, false);
-        assert.equal((await app.request('/api/register', 'POST', { username: 'gast', password: 'ein-laengeres-Testpasswort' })).status, 409);
-        assert.equal((await app.request('/api/login', 'POST', { username: "Gast' OR 1=1 --", password: 'ein-laengeres-Testpasswort' })).status, 401);
+        assert.equal((await app.request('/api/register', 'POST', { username: 'gast', password: 'Aa123456789!' })).status, 409);
+        assert.equal((await app.request('/api/login', 'POST', { username: "Gast' OR 1=1 --", password: 'Aa123456789!' })).status, 401);
         assert.equal((await app.request('/api/login', 'POST', { username: 'Gast', password: 'falsches-Testpasswort' })).status, 401);
+        const longPassword = 'Aa1!' + 'x'.repeat(253);
+        assert.equal((await app.request('/api/register', 'POST', { username: 'Langes Passwort', password: longPassword })).status, 200);
+        assert.equal((await app.request('/api/login', 'POST', { username: 'Langes Passwort', password: longPassword })).status, 200);
         assert.equal((await app.db.get('SELECT is_admin FROM users WHERE username = ?', ['Gast'])).is_admin, 0);
     } finally { await app.close(); }
 });
@@ -274,7 +283,7 @@ test('gleichzeitige Registrierungen dürfen keine Namen erzeugen, die sich nur i
     const app = await instance();
     try {
         const results = await Promise.all(['Alpha', 'alpha'].map(username =>
-            app.request('/api/register', 'POST', { username, password: 'ein-lang-genuges-Testpasswort' })));
+            app.request('/api/register', 'POST', { username, password: 'ein-lang-genuges-Testpasswort1' })));
         assert.deepEqual(results.map(row => row.status).sort(), [200, 409]);
         assert.equal((await app.db.get('SELECT COUNT(*) AS count FROM users')).count, 1);
     } finally { await app.close(); }
@@ -291,7 +300,7 @@ test('Sitzungen: Cookie-Attribute, gehashte Speicherung, Manipulation, Ablauf un
         assert.equal((await direct.json()).error, 'HTTPS erforderlich.');
         assert.equal((await fetch(app.base)).status, 426);
         assert.equal((await fetch(`${app.base}/api/session`, { headers: { 'X-Forwarded-Proto': 'http' } })).status, 426);
-        const signed = await app.request('/api/register', 'POST', { username: 'Mara', password: 'ein-lang-genuges-Testpasswort' });
+        const signed = await app.request('/api/register', 'POST', { username: 'Mara', password: 'ein-lang-genuges-Testpasswort1' });
         assert.match(signed.setCookie, /HttpOnly; SameSite=Lax; Path=\/; Max-Age=604800; Secure/);
         assert.equal(signed.cacheControl, 'no-store');
         const token = signed.cookie.slice(4);
@@ -303,7 +312,7 @@ test('Sitzungen: Cookie-Attribute, gehashte Speicherung, Manipulation, Ablauf un
         assert.equal((await app.request('/api/attendees', 'GET', null, `sid=${'0'.repeat(64)}`)).status, 401);
         await app.db.run('UPDATE sessions SET expires_at = ?', [Date.now() - 1]);
         assert.equal((await app.request('/api/session', 'GET', null, signed.cookie)).data.username, null);
-        const again = await app.request('/api/login', 'POST', { username: 'Mara', password: 'ein-lang-genuges-Testpasswort' });
+        const again = await app.request('/api/login', 'POST', { username: 'Mara', password: 'ein-lang-genuges-Testpasswort1' });
         const loggedOut = await app.request('/api/logout', 'POST', null, again.cookie);
         assert.match(loggedOut.setCookie, /Max-Age=0/);
         assert.equal((await app.request('/api/session', 'GET', null, again.cookie)).data.username, null);
@@ -319,10 +328,10 @@ test('abgelaufene Sessions werden entfernt und bestehende Sessions beim Neustart
     let app;
     try {
         app = await instance(dataRoot, { dataDir });
-        const first = await app.request('/api/register', 'POST', { username: 'Gast', password: 'synthetisches-Gastpasswort' });
+        const first = await app.request('/api/register', 'POST', { username: 'Gast', password: 'synthetisches-Gastpasswort1' });
         await app.db.run('UPDATE sessions SET expires_at = ?', [Date.now() - 1]);
         assert.equal((await app.request('/api/session', 'GET', null, first.cookie)).data.username, null);
-        const next = await app.request('/api/login', 'POST', { username: 'Gast', password: 'synthetisches-Gastpasswort' });
+        const next = await app.request('/api/login', 'POST', { username: 'Gast', password: 'synthetisches-Gastpasswort1' });
         assert.equal(next.status, 200);
         assert.equal((await app.db.get('SELECT COUNT(*) AS count FROM sessions')).count, 1);
         await app.db.run('UPDATE sessions SET expires_at = ?', [Date.now() - 1]);
@@ -349,11 +358,11 @@ test('abgelaufene Sessions werden entfernt und bestehende Sessions beim Neustart
 test('ein Konto behält höchstens zehn aktive Sessions', async () => {
     const app = await instance();
     try {
-        const initial = await app.request('/api/register', 'POST', { username: 'Gast', password: 'synthetisches-Gastpasswort' });
-        const other = await app.request('/api/register', 'POST', { username: 'Andere', password: 'synthetisches-Weiterespasswort' });
+        const initial = await app.request('/api/register', 'POST', { username: 'Gast', password: 'synthetisches-Gastpasswort1' });
+        const other = await app.request('/api/register', 'POST', { username: 'Andere', password: 'synthetisches-Weiterespasswort1' });
         let newest;
         for (let i = 0; i < 10; i++) {
-            newest = await app.request('/api/login', 'POST', { username: 'Gast', password: 'synthetisches-Gastpasswort' });
+            newest = await app.request('/api/login', 'POST', { username: 'Gast', password: 'synthetisches-Gastpasswort1' });
             assert.equal(newest.status, 200);
         }
         assert.equal((await app.db.get('SELECT COUNT(*) AS count FROM sessions WHERE user_id = (SELECT id FROM users WHERE username = ?)', ['Gast'])).count, 10);
@@ -366,9 +375,9 @@ test('ein Konto behält höchstens zehn aktive Sessions', async () => {
 test('fremde und fehlerhafte Origins werden bei schreibenden Anfragen verworfen', async () => {
     const app = await instance();
     try {
-        const signed = await app.request('/api/register', 'POST', { username: 'Lio', password: 'ein-lang-genuges-Testpasswort' });
+        const signed = await app.request('/api/register', 'POST', { username: 'Lio', password: 'ein-lang-genuges-Testpasswort1' });
         const body = { kommt: 'Ja', huette: 'Nein', bettgarnitur: 'Nein' };
-        assert.equal((await app.request('/api/login', 'POST', { username: 'Lio', password: 'ein-lang-genuges-Testpasswort' }, null, '')).status, 403);
+        assert.equal((await app.request('/api/login', 'POST', { username: 'Lio', password: 'ein-lang-genuges-Testpasswort1' }, null, '')).status, 403);
         for (const origin of ['https://angreifer.example', 'null', 'kein-url', app.base + '0',
             app.base.replace('http:', 'https:'), `${app.base}/pfad`, '']) {
             assert.equal((await app.request('/api/rsvp', 'POST', body, signed.cookie, origin)).status, 403);
@@ -391,7 +400,7 @@ test('fremde und fehlerhafte Origins werden bei schreibenden Anfragen verworfen'
 });
 
 test('APP_ORIGIN bindet Schreibanfragen an die konfigurierte HTTPS-/Host-/Port-Kombination', async () => {
-    const body = JSON.stringify({ username: 'Lina', password: 'ein-lang-genuges-Testpasswort' });
+    const body = JSON.stringify({ username: 'Lina', password: 'ein-lang-genuges-Testpasswort1' });
     const request = (base, host, origin, forwardedProto) => new Promise((resolve, reject) => {
         const headers = { Host: host, Origin: origin, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) };
         if (forwardedProto) headers['X-Forwarded-Proto'] = forwardedProto;
@@ -442,7 +451,7 @@ test('Admin-API prüft Rolle und Eingaben; fremde RSVP-Änderungen bleiben unmö
     finally { delete process.env.ADMIN_USERNAME; delete process.env.ADMIN_PASSWORD; }
     try {
         const admin = await app.request('/api/login', 'POST', { username: 'Admin', password: 'ein-lang-genuges-Testpasswort' });
-        const guest = await app.request('/api/register', 'POST', { username: 'Gaby', password: 'ein-lang-genuges-Testpasswort' });
+        const guest = await app.request('/api/register', 'POST', { username: 'Gaby', password: 'ein-lang-genuges-Testpasswort1' });
         const fields = { date: 'Samstag', location_name: 'Hütte', location_address: 'Ort', maps_url: 'https://maps.google.com/', max_cabin_capacity: 1, max_bettgarnitur: 1, rules: 'Regeln', info: 'Info' };
         assert.equal((await app.request('/api/admin/party-info', 'PUT', { ...fields, username: 'Admin', is_admin: true }, guest.cookie)).status, 403);
         for (const value of ['javascript:alert(1)', 'https://google.com.evil.example/maps', 'http://maps.google.com/', 'https://maps.google.com@evil.example/']) {
@@ -472,8 +481,8 @@ test('bei gleichzeitigem RSVP gewinnt höchstens ein Benutzer den letzten freien
         const admin = await app.request('/api/login', 'POST', { username: 'Admin', password: 'ein-lang-genuges-Testpasswort' });
         const config = { date: '', location_name: '', location_address: '', maps_url: '', max_cabin_capacity: 1, max_bettgarnitur: 1, rules: '', info: '' };
         assert.equal((await app.request('/api/admin/party-info', 'PUT', config, admin.cookie)).status, 200);
-        const a = await app.request('/api/register', 'POST', { username: 'Erster', password: 'ein-lang-genuges-Testpasswort' });
-        const b = await app.request('/api/register', 'POST', { username: 'Zweiter', password: 'ein-lang-genuges-Testpasswort' });
+        const a = await app.request('/api/register', 'POST', { username: 'Erster', password: 'ein-lang-genuges-Testpasswort1' });
+        const b = await app.request('/api/register', 'POST', { username: 'Zweiter', password: 'ein-lang-genuges-Testpasswort1' });
         const body = { kommt: 'Ja', huette: 'Ja', bettgarnitur: 'Ja' };
         const results = await Promise.all([a.cookie, b.cookie].map(cookie => app.request('/api/rsvp', 'POST', body, cookie)));
         assert.deepEqual(results.map(row => row.status).sort(), [200, 409]);
@@ -488,7 +497,7 @@ test('Anmeldung wird nach zu vielen Versuchen begrenzt', async () => {
             assert.equal((await app.request('/api/login', 'POST', { username: 'niemand', password: 'falsch' })).status, 401);
         }
         assert.equal((await app.request('/api/login', 'POST', { username: 'niemand', password: 'falsch' })).status, 429);
-        assert.equal((await app.request('/api/register', 'POST', { username: 'Gast', password: 'ein-lang-genuges-Testpasswort' })).status, 429);
+        assert.equal((await app.request('/api/register', 'POST', { username: 'Gast', password: 'ein-lang-genuges-Testpasswort1' })).status, 429);
         assert.equal((await app.db.get('SELECT COUNT(*) AS count FROM users')).count, 0);
     } finally { await app.close(); }
 });
@@ -541,7 +550,7 @@ test('Admin setzt und entfernt einen Karten-Pin; der Google-Link wird aus Koordi
     finally { delete process.env.ADMIN_USERNAME; delete process.env.ADMIN_PASSWORD; }
     try {
         const admin = await app.request('/api/login', 'POST', { username: 'Kartenadmin', password: 'ein-lang-genuges-Testpasswort' });
-        const guest = await app.request('/api/register', 'POST', { username: 'Gast', password: 'ein-lang-genuges-Testpasswort' });
+        const guest = await app.request('/api/register', 'POST', { username: 'Gast', password: 'ein-lang-genuges-Testpasswort1' });
         const fields = { date: 'Heute', location_name: 'Treffpunkt', location_address: 'Berlin', maps_url: 'https://maps.google.com/',
             max_cabin_capacity: 15, max_bettgarnitur: 10, rules: '', info: '' };
         const legacyLink = await app.request('/api/admin/party-info', 'PUT', fields, admin.cookie);

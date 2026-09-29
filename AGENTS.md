@@ -16,3 +16,12 @@ Einstieg: [Wiki-Index](docs/wiki/index.md). Praktische Pflegehinweise: [Wiki-Pfl
 9. **Zum Abschluss jeder Aufgabe:** Aktualität der betroffenen Wiki-Seiten prüfen; wenn keine Wiki-Änderung nötig ist, den Grund im Abschlussbericht kurz nennen. Nach einem Commit im Rahmen der Aufgabe zusätzlich prüfen, ob die vom Commit betroffenen Wiki-Seiten noch aktuell sind. Nicht allein dafür committen oder pushen und keine Hooks ungefragt einrichten.
 
 Wikilinks der Form `[[...]]` gehören in Wiki-Seiten unter `docs/wiki/`; Links aus `AGENTS.md` verwenden normale Markdown-Dateipfade.
+
+## Frontend- und UI-Skills
+
+Die projektlokal installierten Skills liegen unter `.agents/skills/` und werden bei passenden Aufgaben mit dem `skill`-Tool geladen:
+
+- **Design, Layout und visuelle UI-Arbeit:** Vor dem Gestalten neuer Ansichten oder dem Überarbeiten von Layout, Farben, Typografie, Komponenten oder Interaktionszuständen [`frontend-design`](.agents/skills/frontend-design/SKILL.md) laden und anwenden. Für dieses Projekt hat die bestehende Oberfläche mit [Gewünschtem Erscheinungsbild](docs/wiki/design/erscheinungsbild.md) und dem tatsächlichen CSS Vorrang vor allgemeinen Stilvorschlägen des Skills. Keine neue visuelle Identität ohne entsprechenden Auftrag erfinden.
+- **UI-/UX-Review und Barrierefreiheit:** Bei Prüfungen von Frontend, Usability oder Accessibility sowie zur abschließenden Prüfung betroffener HTML-/CSS-/Browser-JS-Dateien nach UI-Änderungen [`web-design-guidelines`](.agents/skills/web-design-guidelines/SKILL.md) laden und anwenden. Die im Skill referenzierten aktuellen Web Interface Guidelines abrufen; Hinweise auf den konkreten Projektkontext und die betroffenen Dateien beziehen.
+
+Bei reinen Backend-, Daten- oder Textänderungen ohne UI-Bezug diese Skills nicht allein wegen ihres Namens laden. Für Änderungen unter `public/` weiterhin zuerst die Wiki-Designreferenz und die vorhandene Implementierung lesen.

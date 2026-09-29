@@ -8,7 +8,7 @@ Bei `NODE_ENV=production` lehnt die Anwendung **jede** über den lokalen Nginx-U
 
 | Methode und Pfad | Anmeldung | Funktion |
 | --- | --- | --- |
-| `POST /api/register` | nein | Konto anlegen; `{ username, password }`, Session-Cookie setzen, nie automatisch Admin werden |
+| `POST /api/register` | nein | Konto anlegen; `{ username, password }` mit mindestens 12 Zeichen, Groß-/Kleinbuchstabe, Ziffer und Sonderzeichen im Passwort; Session-Cookie setzen, nie automatisch Admin werden |
 | `POST /api/login` | nein | Konto prüfen, Session-Cookie setzen |
 | `GET /api/session` | nein | angemeldeten Benutzernamen und Adminstatus melden, sonst `username: null` |
 | `POST /api/logout` | ja | aktuelle Session entfernen und Cookie löschen |

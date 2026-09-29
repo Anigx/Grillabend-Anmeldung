@@ -27,6 +27,7 @@
     animation: slideInTop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     max-height: min(85vh, 780px);
     overflow-y: auto;
+    overscroll-behavior: contain;
 }
 
 .modal-content h2 {
@@ -52,7 +53,7 @@
     border-radius: 8px;
     font-weight: 600;
     cursor: pointer;
-    transition: all 0.3s ease;
+    transition: background-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease;
     flex: 1;
 }
 
@@ -87,5 +88,12 @@
     to {
         opacity: 1;
         transform: translateY(0);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .modal-overlay,
+    .modal-content {
+        animation: none;
     }
 }

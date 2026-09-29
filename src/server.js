@@ -13,6 +13,12 @@ function validText(value, max = 200) {
     return typeof value === 'string' && value.trim().length <= max;
 }
 
+function validNewPassword(value) {
+    return typeof value === 'string' && value.length >= 12 &&
+        /\p{Lu}/u.test(value) && /\p{Ll}/u.test(value) && /\p{Nd}/u.test(value) &&
+        /[^\p{L}\p{N}\s]/u.test(value);
+}
+
 function mapsUrl(value) {
     if (!value) return true;
     try {
@@ -173,8 +179,8 @@ async function createApp(options = {}) {
         try {
             const { username, password } = req.body || {};
             if (typeof username !== 'string' || !/^[\p{L}\p{N} _.-]{2,40}$/u.test(username.trim()) ||
-                typeof password !== 'string' || password.length < 12 || password.length > 256) {
-                return res.status(400).json({ error: 'Name: 2–40 Zeichen; Passwort: 12–256 Zeichen.' });
+                !validNewPassword(password)) {
+                return res.status(400).json({ error: 'Name: 2–40 Zeichen; Passwort: mindestens 12 Zeichen mit Groß- und Kleinbuchstaben, Zahl und Sonderzeichen.' });
             }
             const name = username.trim();
             const passwordHash = await hashPassword(password);
@@ -192,7 +198,7 @@ async function createApp(options = {}) {
     app.post('/api/login', authLimit, async (req, res, next) => {
         try {
             const { username, password } = req.body || {};
-            if (typeof username !== 'string' || typeof password !== 'string' || username.length > 40 || password.length > 256) {
+            if (typeof username !== 'string' || typeof password !== 'string' || username.length > 40) {
                 return res.status(400).json({ error: 'Ungültige Eingabe.' });
             }
             const user = await db.get('SELECT * FROM users WHERE username = ? COLLATE NOCASE', [username.trim()]);

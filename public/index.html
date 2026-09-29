@@ -3,8 +3,11 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#0a0a16">
     <title>Grillabend – Anmeldung</title>
     <meta name="description" content="Anmeldung und Planung für unseren Grillabend.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="/css/style.css">
     <link rel="stylesheet" href="/css/modal.css">
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
@@ -13,31 +16,57 @@
 <body>
     <div class="background-animation" aria-hidden="true"></div>
 
-    <main class="container" id="authContainer">
-        <header>
-            <h1>🐾 Grillabend</h1>
-            <p>Bitte melde dich an oder erstelle einen Account.</p>
+    <main class="container auth-container" id="authContainer">
+        <header class="page-intro auth-intro">
+            <span class="brand-mark" aria-hidden="true">🐾</span>
+            <h1>Grillabend</h1>
+            <p>Ein Abend zusammen. Melde dich an und sag uns, ob du dabei bist.</p>
         </header>
+        <div class="auth-mode" role="group" aria-label="Anmeldung oder Registrierung">
+            <button type="button" id="loginModeBtn" class="auth-mode-btn" aria-pressed="true">Anmelden</button>
+            <button type="button" id="registerModeBtn" class="auth-mode-btn" aria-pressed="false">Neues Konto</button>
+        </div>
         <form id="authForm">
+            <h2 id="authTitle" class="form-title">Willkommen zurück</h2>
+            <p id="authDescription" class="form-description">Mit deinem Konto kannst du deine Rückmeldung verwalten.</p>
             <div class="form-group">
-                <label for="username">Name</label>
-                <input id="username" name="username" type="text" autocomplete="username" maxlength="40" minlength="2" required>
+                <label for="username">Benutzername</label>
+                <input id="username" name="username" type="text" autocomplete="username" spellcheck="false" maxlength="40" minlength="2" required>
             </div>
             <div class="form-group">
                 <label for="password">Passwort</label>
                 <input id="password" name="password" type="password" autocomplete="current-password" required>
             </div>
-            <div class="form-actions">
-                <button class="submit-btn" id="loginBtn" type="submit">Anmelden 🐾</button>
-                <button class="submit-btn secondary-btn" id="registerBtn" type="button">Registrieren 📝</button>
+            <div id="registrationFields" class="hidden">
+                <div class="form-group">
+                    <label for="confirmPassword">Passwort wiederholen</label>
+                    <input id="confirmPassword" name="confirmPassword" type="password" autocomplete="new-password" aria-describedby="confirmHint" disabled>
+                    <p id="confirmHint" class="field-hint hidden" role="status" aria-live="polite"></p>
+                </div>
+                <div class="password-strength-card" role="group" aria-label="Passwortstärke">
+                    <p id="passwordStrength" class="strength-label" role="status" aria-live="polite">Passwortstärke: Noch kein Passwort</p>
+                    <div class="strength-track" aria-hidden="true"><span id="strengthFill"></span></div>
+                </div>
+                <div class="requirements-panel" role="group" aria-label="Passwortvorgaben">
+                    <p class="requirements-title">Passwortvorgaben</p>
+                    <ul class="password-requirements">
+                        <li id="requireLength">Mindestens 12 Zeichen</li>
+                        <li id="requireUpper">Großbuchstabe</li>
+                        <li id="requireLower">Kleinbuchstabe</li>
+                        <li id="requireNumber">Zahl</li>
+                        <li id="requireSpecial">Sonderzeichen</li>
+                    </ul>
+                </div>
             </div>
-            <p class="form-note">Bei der Registrierung: Passwort mit mindestens 12 Zeichen wählen.</p>
+            <div class="form-actions">
+                <button class="submit-btn" id="authSubmitBtn" type="submit">Anmelden</button>
+            </div>
             <p id="authMessage" class="hidden message" role="status" aria-live="polite"></p>
         </form>
     </main>
 
     <main class="container hidden" id="rsvpContainer">
-        <header>
+        <header class="page-intro">
             <div class="user-header">
                 <span id="loggedInUser"></span>
                 <div class="header-actions">
@@ -45,19 +74,22 @@
                     <button type="button" id="logoutBtn" class="logout-btn">Abmelden</button>
                 </div>
             </div>
-            <h1>🐾 Grillabend</h1>
-            <p>Trag dich ein, damit wir planen können!</p>
+            <h1>Grillabend</h1>
+            <p>Alles für unseren Abend an einem Ort. Sag uns, ob du dabei bist.</p>
         </header>
 
-        <section class="party-info-card" aria-label="Veranstaltungsdetails">
-            <div class="info-row"><span class="info-icon" aria-hidden="true">📅</span><div class="info-content"><span class="info-label">Wann?</span><span class="info-value" id="displayDate"></span></div></div>
-            <div class="info-row"><span class="info-icon" aria-hidden="true">📍</span><div class="info-content"><span class="info-label">Wo?</span><span class="info-value" id="displayLocationName"></span><span class="info-subvalue" id="displayLocationAddress"></span><a id="displayMapsLink" class="maps-link hidden" target="_blank" rel="noopener noreferrer">Auf Google Maps zeigen 🗺️</a></div></div>
+        <section class="party-info-card" aria-labelledby="partyInfoTitle">
+            <h2 id="partyInfoTitle" class="section-title">Auf einen Blick</h2>
+            <div class="info-row"><span class="info-icon" aria-hidden="true">📅</span><div class="info-content"><span class="info-label">Termin</span><span class="info-value" id="displayDate"></span></div></div>
+            <div class="info-row"><span class="info-icon" aria-hidden="true">📍</span><div class="info-content"><span class="info-label">Treffpunkt</span><span class="info-value" id="displayLocationName"></span><span class="info-subvalue" id="displayLocationAddress"></span><a id="displayMapsLink" class="maps-link hidden" target="_blank" rel="noopener noreferrer">In Google Maps öffnen</a></div></div>
             <div id="mapSection" class="hidden"><iframe id="mapFrame" class="map-frame" title="Karte des Veranstaltungsorts" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe><p class="form-note">Beim Laden der Karte werden Daten an Google übertragen.</p></div>
             <div id="infoSection" class="hidden"><span class="info-label">Informationen</span><p id="displayInfo" class="multiline"></p></div>
             <div id="rulesSection" class="hidden"><span class="info-label">Regeln</span><p id="displayRules" class="multiline"></p></div>
         </section>
 
-        <form id="rsvpForm">
+        <form id="rsvpForm" class="rsvp-form">
+            <h2 class="section-title">Deine Rückmeldung</h2>
+            <p class="section-description">Du kannst deine Antwort später jederzeit ändern.</p>
             <fieldset class="form-group choice-group">
                 <legend>Bist du dabei?</legend>
                 <div class="radio-group">
@@ -82,18 +114,18 @@
             </fieldset>
             <p id="vielleichtHint" class="hidden hint-box">Bei „Vielleicht“ wird kein Schlafplatz reserviert.</p>
             <div class="form-actions">
-                <button type="submit" class="submit-btn" id="submitBtn">Eintragen 🐾</button>
-                <button type="button" class="delete-btn hidden" id="deleteBtn">Eintrag löschen 🗑️</button>
+                <button type="submit" class="submit-btn" id="submitBtn">Antwort speichern</button>
+                <button type="button" class="delete-btn hidden" id="deleteBtn">Eintrag löschen</button>
             </div>
             <p id="rsvpMessage" class="hidden message" role="status" aria-live="polite"></p>
         </form>
 
-        <section class="attendee-list-section">
-            <h2>Wer ist schon dabei?</h2>
+        <section class="attendee-list-section" aria-labelledby="attendeesTitle">
+            <h2 id="attendeesTitle" class="section-title">Wer ist schon dabei?</h2>
             <div class="stats">
-                <div class="stat-box"><span id="count_ja">0</span> Ja</div>
+                <div class="stat-box"><span id="count_ja">0</span> Zusagen</div>
                 <div class="stat-box"><span id="count_vielleicht">0</span> Vielleicht</div>
-                <div class="stat-box"><span id="count_huette">0/15</span> In der Hütte</div>
+                <div class="stat-box"><span id="count_huette">0/15</span> Hüttenschlaf</div>
                 <div class="stat-box"><span id="count_bettgarnitur">0/10</span> Bettgarnitur</div>
             </div>
             <ul id="attendeeList" class="attendee-list"></ul>
