@@ -6,7 +6,7 @@ if (require.main === module) {
         if (process.env.NODE_ENV === 'production') {
             app.listen(port, '127.0.0.1', () => console.log(`Grillabend hinter HTTPS-Proxy auf 127.0.0.1:${port}`));
         } else {
-            app.listen(port, () => console.log(`Grillabend läuft auf http://localhost:${port}`));
+            app.listen(port, '127.0.0.1', () => console.log(`Grillabend läuft auf http://127.0.0.1:${port}`));
         }
     }).catch(error => {
         console.error('Start fehlgeschlagen:', error);

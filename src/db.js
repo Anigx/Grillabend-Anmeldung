@@ -2,6 +2,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const sqlite3 = require('sqlite3').verbose();
 const { hashPassword } = require('./security');
+const MAX_USER_SESSIONS = 10;
 
 function connect(filename, flags) {
     return new Promise((resolve, reject) => {
@@ -101,6 +102,7 @@ async function openDatabase({ dataDir, legacyDir }) {
             CREATE TABLE IF NOT EXISTS sessions (
                 token_hash TEXT PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, expires_at INTEGER NOT NULL
             );
+            CREATE INDEX IF NOT EXISTS sessions_expires_at ON sessions (expires_at);
             CREATE TABLE IF NOT EXISTS rsvps (
                 username TEXT PRIMARY KEY, kommt TEXT NOT NULL, huette TEXT NOT NULL,
                 bettgarnitur TEXT NOT NULL DEFAULT 'Nein', updated_at TEXT NOT NULL
@@ -121,6 +123,13 @@ async function openDatabase({ dataDir, legacyDir }) {
         }
         await importLegacy(db, legacyDir);
         await db.run('INSERT OR IGNORE INTO party_info (id) VALUES (1)');
+        await db.run('DELETE FROM sessions WHERE expires_at <= ?', [Date.now()]);
+        await db.run(`DELETE FROM sessions WHERE rowid IN (
+            SELECT rowid FROM (
+                SELECT rowid, ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY expires_at DESC, rowid DESC) AS number
+                FROM sessions
+            ) WHERE number > ?
+        )`, [MAX_USER_SESSIONS]);
         return db;
     } catch (error) {
         await db.close();
@@ -128,4 +137,4 @@ async function openDatabase({ dataDir, legacyDir }) {
     }
 }
 
-module.exports = { openDatabase };
+module.exports = { openDatabase, MAX_USER_SESSIONS };

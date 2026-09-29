@@ -9,6 +9,7 @@
     <link rel="stylesheet" href="/css/admin.css">
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
     <script src="/vendor/leaflet/leaflet.js" defer></script>
+    <script src="/js/admin-exports.js" defer></script>
     <script src="/js/admin.js" defer></script>
 </head>
 <body>
@@ -23,7 +24,12 @@
             <a class="logout-btn" href="/">← Zur Teilnehmerseite</a>
         </header>
 
-        <div class="admin-grid">
+        <div class="admin-tabs" role="tablist" aria-label="Adminbereiche">
+            <button id="eventTab" class="admin-tab" type="button" role="tab" aria-selected="true" aria-controls="eventPanel">Veranstaltung</button>
+            <button id="usersTab" class="admin-tab" type="button" role="tab" aria-selected="false" aria-controls="usersPanel" tabindex="-1">User-Übersicht</button>
+        </div>
+
+        <div id="eventPanel" class="admin-grid" role="tabpanel" aria-labelledby="eventTab">
             <form id="adminForm" class="admin-panel" aria-label="Veranstaltungsdaten bearbeiten">
                 <h2>Veranstaltung</h2>
                 <div class="form-group"><label for="adminDate">Datum &amp; Uhrzeit</label><input type="text" id="adminDate" maxlength="300"></div>
@@ -86,6 +92,45 @@
                 </section>
             </aside>
         </div>
+
+        <section id="usersPanel" class="admin-panel hidden" role="tabpanel" aria-labelledby="usersTab">
+            <div class="admin-users-heading">
+                <h2>Alle User</h2>
+                <button id="exportToggle" class="admin-export-toggle" type="button" aria-label="Exportoptionen anzeigen" title="Exportoptionen anzeigen" aria-expanded="false" aria-controls="exportOptions">
+                    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 3v12m-4-4 4 4 4-4M4 17v3h16v-3"/></svg>
+                </button>
+                <div id="exportOptions" class="admin-export-actions" role="group" aria-label="Gefilterte User exportieren" aria-hidden="true" inert>
+                    <span>Aktuelle Auswahl exportieren:</span>
+                    <button type="button" class="logout-btn" data-export="xlsx" disabled>Excel (.xlsx)</button>
+                    <button type="button" class="logout-btn" data-export="csv" disabled>CSV (.csv)</button>
+                    <button type="button" class="logout-btn" data-export="pdf" disabled>PDF (.pdf)</button>
+                    <button type="button" class="logout-btn" data-export="png" disabled>Bild (.png)</button>
+                </div>
+            </div>
+            <p class="form-note">Konten und ihre aktuelle Antwort auf einen Blick. Auch User ohne Eintrag werden angezeigt.</p>
+            <form id="usersFilters" class="admin-filters" role="search" aria-label="User filtern">
+                <div><label for="userNameFilter">Name</label><input id="userNameFilter" type="search" placeholder="Name suchen" autocomplete="off"></div>
+                <div><label for="userAttendanceFilter">Teilnahme</label><select id="userAttendanceFilter"><option value="">Alle</option><option value="Ja">Ja</option><option value="Nein">Nein</option><option value="Vielleicht">Vielleicht</option><option value="none">Keine Antwort</option></select></div>
+                <div><label for="userCabinFilter">Hüttenschlaf</label><select id="userCabinFilter"><option value="">Alle</option><option value="Ja">Ja</option><option value="Nein">Nein</option><option value="none">Keine Antwort</option></select></div>
+                <div><label for="userBeddingFilter">Bettgarnitur</label><select id="userBeddingFilter"><option value="">Alle</option><option value="Ja">Ja</option><option value="Nein">Nein</option><option value="none">Keine Antwort</option></select></div>
+                <button id="resetUsersFilters" type="button" class="logout-btn">Filter zurücksetzen</button>
+            </form>
+            <p id="usersMessage" class="form-note" role="status" aria-live="polite">Lade User …</p>
+            <div class="admin-table-wrap">
+                <table class="admin-users-table">
+                    <thead><tr>
+                        <th scope="col">User <button type="button" class="column-help" data-help="username" aria-label="Erklärung zu User anzeigen" aria-expanded="false" aria-controls="columnHelpTooltip">?</button></th>
+                        <th scope="col">Teilnahme <button type="button" class="column-help" data-help="kommt" aria-label="Erklärung zu Teilnahme anzeigen" aria-expanded="false" aria-controls="columnHelpTooltip">?</button></th>
+                        <th scope="col">Hüttenschlaf <button type="button" class="column-help" data-help="huette" aria-label="Erklärung zu Hüttenschlaf anzeigen" aria-expanded="false" aria-controls="columnHelpTooltip">?</button></th>
+                        <th scope="col">Bettgarnitur <button type="button" class="column-help" data-help="bettgarnitur" aria-label="Erklärung zu Bettgarnitur anzeigen" aria-expanded="false" aria-controls="columnHelpTooltip">?</button></th>
+                        <th scope="col">Antwort vom <button type="button" class="column-help" data-help="updated_at" aria-label="Erklärung zu Antwort vom anzeigen" aria-expanded="false" aria-controls="columnHelpTooltip">?</button></th>
+                    </tr></thead>
+                    <tbody id="usersTableBody"></tbody>
+                </table>
+            </div>
+        </section>
     </main>
+    <div id="columnHelpTooltip" class="hidden column-help-tooltip" role="tooltip"></div>
+    <p id="exportMessage" class="hidden message admin-export-status" role="status" aria-live="polite"></p>
 </body>
 </html>

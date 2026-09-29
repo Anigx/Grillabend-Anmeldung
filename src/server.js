@@ -1,13 +1,13 @@
 const express = require('express');
 const path = require('node:path');
 const { randomBytes } = require('node:crypto');
-const { openDatabase } = require('./db');
+const { openDatabase, MAX_USER_SESSIONS } = require('./db');
 const { hashPassword, verifyPassword, tokenHash } = require('./security');
 
 const SESSION_AGE = 7 * 24 * 60 * 60 * 1000;
 const PROJECT_DIR = path.resolve(__dirname, '..');
 const PUBLIC_DIR = path.join(PROJECT_DIR, 'public');
-const PUBLIC_FILES = ['css/style.css', 'css/modal.css', 'css/admin.css', 'js/app.js', 'js/admin.js'];
+const PUBLIC_FILES = ['css/style.css', 'css/modal.css', 'css/admin.css', 'js/app.js', 'js/admin.js', 'js/admin-exports.js'];
 
 function validText(value, max = 200) {
     return typeof value === 'string' && value.trim().length <= max;
@@ -23,7 +23,22 @@ function mapsUrl(value) {
     }
 }
 
+function parseOrigin(value) {
+    if (typeof value !== 'string') return null;
+    try {
+        const url = new URL(value);
+        return ['http:', 'https:'].includes(url.protocol) && value === url.origin ? url.origin : null;
+    } catch {
+        return null;
+    }
+}
+
 async function createApp(options = {}) {
+    const originSetting = options.origin ?? process.env.APP_ORIGIN;
+    const allowedOrigin = originSetting === undefined ? null : parseOrigin(originSetting);
+    if (originSetting !== undefined && (!allowedOrigin || (process.env.NODE_ENV === 'production' && !allowedOrigin.startsWith('https://')))) {
+        throw new Error('APP_ORIGIN muss eine gültige Origin sein (Schema, Host, optional Port; in Produktion HTTPS).');
+    }
     const db = await openDatabase({
         dataDir: options.dataDir || process.env.DATA_DIR || path.join(PROJECT_DIR, 'data'),
         legacyDir: options.legacyDir || PROJECT_DIR
@@ -39,11 +54,24 @@ async function createApp(options = {}) {
             await db.close();
             throw new Error('Ungültige Admin-Zugangsdaten: Benutzername 2–40 Zeichen, Passwort mindestens 12 Zeichen.');
         }
-        const existing = await db.get('SELECT id, is_admin FROM users WHERE username = ? COLLATE NOCASE', [adminName.trim()]);
+        const existing = await db.get('SELECT id, is_admin, password_hash FROM users WHERE username = ? COLLATE NOCASE', [adminName.trim()]);
         if (existing) {
             if (existing.is_admin !== 1) {
                 await db.close();
                 throw new Error('Der konfigurierte Admin-Name gehört bereits zu einem normalen Konto.');
+            }
+            if (!(await verifyPassword(adminPassword, existing.password_hash))) {
+                const newHash = await hashPassword(adminPassword);
+                await db.exec('BEGIN IMMEDIATE');
+                try {
+                    await db.run('UPDATE users SET password_hash = ? WHERE id = ?', [newHash, existing.id]);
+                    await db.run('DELETE FROM sessions WHERE user_id = ?', [existing.id]);
+                    await db.exec('COMMIT');
+                } catch (error) {
+                    await db.exec('ROLLBACK');
+                    await db.close();
+                    throw error;
+                }
             }
         } else {
             await db.run('INSERT INTO users (username, password_hash, is_admin) VALUES (?, ?, 1)', [adminName.trim(), await hashPassword(adminPassword)]);
@@ -69,11 +97,19 @@ async function createApp(options = {}) {
     app.use((req, res, next) => {
         if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) return next();
         const origin = req.get('origin');
-        // Browsers send Origin on cross-site writes. Cookie + SameSite and this check protect state changes.
-        if (origin) {
-            let host;
-            try { host = new URL(origin).host; } catch { return res.status(403).json({ error: 'Ungültiger Anfrageursprung.' }); }
-            if (!req.get('host') || host !== req.get('host')) return res.status(403).json({ error: 'Ungültiger Anfrageursprung.' });
+        const site = req.get('sec-fetch-site');
+        const host = req.get('host');
+        let requestOrigin = null;
+        if (host) {
+            try {
+                const url = new URL(`${req.protocol}://${host}`);
+                if (!url.username && !url.password && url.pathname === '/' && !url.search && !url.hash) requestOrigin = url.origin;
+            } catch { /* Ein fehlerhafter Host wird abgelehnt. */ }
+        }
+        // Same-origin browser writes carry Origin; reject missing, malformed, cross-scheme or cross-site writes.
+        if (!requestOrigin || (allowedOrigin && requestOrigin !== allowedOrigin) || parseOrigin(origin) !== requestOrigin ||
+            (site && !['same-origin', 'none'].includes(site))) {
+            return res.status(403).json({ error: 'Ungültiger Anfrageursprung.' });
         }
         next();
     });
@@ -103,9 +139,19 @@ async function createApp(options = {}) {
         next();
     }
 
+    let sessionWrites = Promise.resolve();
     async function issueSession(res, user) {
-        const token = randomBytes(32).toString('hex');
-        await db.run('INSERT INTO sessions (token_hash, user_id, expires_at) VALUES (?, ?, ?)', [tokenHash(token), user.id, Date.now() + SESSION_AGE]);
+        const current = sessionWrites.then(async () => {
+            const token = randomBytes(32).toString('hex');
+            await db.run('DELETE FROM sessions WHERE expires_at <= ?', [Date.now()]);
+            await db.run('INSERT INTO sessions (token_hash, user_id, expires_at) VALUES (?, ?, ?)', [tokenHash(token), user.id, Date.now() + SESSION_AGE]);
+            await db.run(`DELETE FROM sessions WHERE user_id = ? AND token_hash NOT IN (
+                SELECT token_hash FROM sessions WHERE user_id = ? ORDER BY expires_at DESC, rowid DESC LIMIT ?
+            )`, [user.id, user.id, MAX_USER_SESSIONS]);
+            return token;
+        });
+        sessionWrites = current.catch(() => {});
+        const token = await current;
         cookie(res, token, SESSION_AGE / 1000);
         res.json({ username: user.username, is_admin: user.is_admin === 1 });
     }
@@ -204,6 +250,15 @@ async function createApp(options = {}) {
         catch (error) { next(error); }
     });
 
+    app.get('/api/admin/users', requireUser, requireAdmin, async (req, res, next) => {
+        try {
+            res.json(await db.all(`SELECT users.username, rsvps.kommt, rsvps.huette,
+                rsvps.bettgarnitur, rsvps.updated_at FROM users
+                LEFT JOIN rsvps ON rsvps.username = users.username COLLATE NOCASE
+                ORDER BY users.username COLLATE NOCASE, users.id`));
+        } catch (error) { next(error); }
+    });
+
     app.put('/api/admin/party-info', requireUser, requireAdmin, async (req, res, next) => {
         try {
             const fields = ['date', 'location_name', 'location_address', 'maps_url', 'rules', 'info'];
@@ -285,6 +340,11 @@ async function createApp(options = {}) {
     for (const file of ['leaflet.js', 'leaflet.css']) {
         app.get(`/vendor/leaflet/${file}`, (req, res) => res.sendFile(path.join(PROJECT_DIR, 'node_modules', 'leaflet', 'dist', file)));
     }
+    for (const [route, file] of [
+        ['exceljs/exceljs.min.js', 'exceljs/dist/exceljs.min.js'],
+        ['pdf-lib/pdf-lib.min.js', 'pdf-lib/dist/pdf-lib.min.js'],
+        ['jszip/jszip.min.js', 'jszip/dist/jszip.min.js']
+    ]) app.get(`/vendor/${route}`, (req, res) => res.sendFile(path.join(PROJECT_DIR, 'node_modules', file)));
     app.use((error, req, res, next) => {
         const status = Number.isInteger(error.status) && error.status >= 400 && error.status < 500 ? error.status : 500;
         if (status === 500) console.error(error);

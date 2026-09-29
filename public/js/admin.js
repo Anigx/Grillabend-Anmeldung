@@ -20,6 +20,199 @@ document.addEventListener('DOMContentLoaded', () => {
         el('adminMessage').className = text ? `message ${type}` : 'hidden message';
     }
 
+    const columnHelp = {
+        username: 'Registrierter Benutzername. Auch Konten ohne Teilnahmeantwort werden angezeigt.',
+        kommt: 'Die aktuelle Teilnahmeantwort: Ja, Nein oder Vielleicht. „Keine Antwort“ bedeutet, dass noch kein Eintrag gespeichert wurde.',
+        huette: 'Ob ein Schlafplatz in der Hütte gewünscht ist (Ja/Nein). Ohne Teilnahmeantwort steht hier „–“.',
+        bettgarnitur: 'Ob eine Bettgarnitur gewünscht ist (Ja/Nein). Ohne Teilnahmeantwort steht hier „–“.',
+        updated_at: 'Wann die Teilnahmeantwort zuletzt gespeichert oder geändert wurde. Ohne Antwort steht „–“. Das ist nicht das Registrierungsdatum.'
+    };
+    const helpTooltip = el('columnHelpTooltip');
+    let activeHelp = null;
+    function closeHelp() {
+        if (!activeHelp) return;
+        activeHelp.setAttribute('aria-expanded', 'false');
+        activeHelp.removeAttribute('aria-describedby');
+        helpTooltip.classList.add('hidden');
+        activeHelp = null;
+    }
+    for (const button of document.querySelectorAll('.column-help')) {
+        button.addEventListener('click', event => {
+            event.stopPropagation();
+            if (activeHelp === button) return closeHelp();
+            closeHelp();
+            activeHelp = button;
+            helpTooltip.textContent = columnHelp[button.dataset.help];
+            helpTooltip.classList.remove('hidden');
+            button.setAttribute('aria-expanded', 'true');
+            button.setAttribute('aria-describedby', helpTooltip.id);
+            const rect = button.getBoundingClientRect();
+            helpTooltip.style.left = `${Math.max(12, Math.min(rect.left, window.innerWidth - helpTooltip.offsetWidth - 12))}px`;
+            helpTooltip.style.top = `${rect.bottom + helpTooltip.offsetHeight + 12 > window.innerHeight ?
+                Math.max(12, rect.top - helpTooltip.offsetHeight - 8) : rect.bottom + 8}px`;
+        });
+        button.addEventListener('blur', closeHelp);
+    }
+    document.addEventListener('click', closeHelp);
+    document.addEventListener('keydown', event => {
+        if (event.key === 'Escape' && activeHelp) {
+            const button = activeHelp;
+            closeHelp();
+            button.focus();
+        }
+    });
+    window.addEventListener('scroll', closeHelp, true);
+    window.addEventListener('resize', closeHelp);
+
+    const tabs = [el('eventTab'), el('usersTab')];
+    function selectTab(tab, focus = false) {
+        for (const choice of tabs) {
+            const selected = choice === tab;
+            choice.setAttribute('aria-selected', String(selected));
+            choice.tabIndex = selected ? 0 : -1;
+            el(choice.getAttribute('aria-controls')).classList.toggle('hidden', !selected);
+        }
+        if (focus) tab.focus();
+        if (tab === el('eventTab')) {
+            setExportOpen(false);
+            window.requestAnimationFrame(() => map.invalidateSize());
+        }
+        else loadUsers();
+    }
+
+    for (const tab of tabs) {
+        tab.addEventListener('click', () => selectTab(tab));
+        tab.addEventListener('keydown', event => {
+            const index = tabs.indexOf(tab);
+            const target = event.key === 'ArrowRight' ? tabs[(index + 1) % tabs.length] :
+                event.key === 'ArrowLeft' ? tabs[(index + tabs.length - 1) % tabs.length] :
+                    event.key === 'Home' ? tabs[0] : event.key === 'End' ? tabs[tabs.length - 1] : null;
+            if (target) { event.preventDefault(); selectTab(target, true); }
+        });
+    }
+
+    let users = [];
+    let filteredUsers = [];
+    let exportBusy = false;
+    let exportNoticeTimer = null;
+    const exportToggle = el('exportToggle');
+    const exportOptions = el('exportOptions');
+    function setExportOpen(open) {
+        if (!open && exportOptions.contains(document.activeElement)) exportToggle.focus();
+        exportOptions.classList.toggle('is-open', open);
+        exportOptions.inert = !open;
+        exportOptions.setAttribute('aria-hidden', String(!open));
+        exportToggle.setAttribute('aria-expanded', String(open));
+        exportToggle.setAttribute('aria-label', open ? 'Exportoptionen schließen' : 'Exportoptionen anzeigen');
+        exportToggle.title = open ? 'Exportoptionen schließen' : 'Exportoptionen anzeigen';
+    }
+    exportToggle.addEventListener('click', () => setExportOpen(exportToggle.getAttribute('aria-expanded') !== 'true'));
+    const exportButtons = [...document.querySelectorAll('[data-export]')];
+    function updateExportButtons() {
+        for (const button of exportButtons) button.disabled = exportBusy || !filteredUsers.length;
+    }
+
+    exportOptions.addEventListener('click', async event => {
+        const button = event.target.closest('[data-export]');
+        if (!button || exportBusy || !filteredUsers.length) return;
+        const status = el('exportMessage');
+        window.clearTimeout(exportNoticeTimer);
+        exportNoticeTimer = null;
+        exportBusy = true;
+        updateExportButtons();
+        status.textContent = 'Export wird erstellt …';
+        status.className = 'form-note admin-export-status';
+        try {
+            await window.AdminExports.download(button.dataset.export, filteredUsers.slice());
+            setExportOpen(false);
+            status.textContent = 'Download gestartet.';
+            status.className = 'message success admin-export-status';
+            exportNoticeTimer = window.setTimeout(() => {
+                status.textContent = '';
+                status.className = 'hidden message admin-export-status';
+                exportNoticeTimer = null;
+            }, 3000);
+        } catch (error) {
+            status.textContent = error.message || 'Export fehlgeschlagen.';
+            status.className = 'message error admin-export-status';
+        } finally {
+            exportBusy = false;
+            updateExportButtons();
+        }
+    });
+
+    function matchesChoice(value, choice) {
+        return !choice || (choice === 'none' ? value === null : value === choice);
+    }
+
+    function renderUsers() {
+        const name = el('userNameFilter').value.trim().toLocaleLowerCase('de-DE');
+        filteredUsers = users.filter(user =>
+            user.username.toLocaleLowerCase('de-DE').includes(name) &&
+            matchesChoice(user.kommt, el('userAttendanceFilter').value) &&
+            matchesChoice(user.huette, el('userCabinFilter').value) &&
+            matchesChoice(user.bettgarnitur, el('userBeddingFilter').value));
+        const body = el('usersTableBody');
+        body.replaceChildren();
+        for (const user of filteredUsers) {
+            const row = document.createElement('tr');
+            const values = [user.username, user.kommt || 'Keine Antwort', user.huette || '–', user.bettgarnitur || '–'];
+            for (const value of values) {
+                const cell = document.createElement('td');
+                cell.textContent = value;
+                if (value === 'Keine Antwort') cell.classList.add('no-answer');
+                row.append(cell);
+            }
+            const dateCell = document.createElement('td');
+            if (user.updated_at) {
+                const time = document.createElement('time');
+                time.dateTime = user.updated_at;
+                const date = new Date(user.updated_at);
+                time.textContent = Number.isNaN(date.getTime()) ? user.updated_at :
+                    new Intl.DateTimeFormat('de-DE', { dateStyle: 'short', timeStyle: 'short' }).format(date);
+                dateCell.append(time);
+            } else dateCell.textContent = '–';
+            row.append(dateCell);
+            body.append(row);
+        }
+        el('usersMessage').textContent = !users.length ? 'Noch keine User vorhanden.' :
+            filteredUsers.length ? `${filteredUsers.length} von ${users.length} Usern angezeigt` : 'Keine User für diese Filter gefunden.';
+        updateExportButtons();
+    }
+
+    el('usersFilters').addEventListener('submit', event => event.preventDefault());
+    el('usersFilters').addEventListener('input', renderUsers);
+    el('usersFilters').addEventListener('change', renderUsers);
+    el('resetUsersFilters').addEventListener('click', () => {
+        el('usersFilters').reset();
+        renderUsers();
+    });
+
+    async function loadUsers() {
+        const status = el('usersMessage');
+        status.textContent = 'Lade User …';
+        status.className = 'form-note';
+        filteredUsers = [];
+        updateExportButtons();
+        try {
+            const response = await fetch('/api/admin/users');
+            if (response.status === 401 || response.status === 403) {
+                window.location.assign('/');
+                return;
+            }
+            if (!response.ok) throw new Error('User konnten nicht geladen werden.');
+            users = await response.json();
+            renderUsers();
+        } catch (error) {
+            users = [];
+            filteredUsers = [];
+            el('usersTableBody').replaceChildren();
+            status.textContent = error.message;
+            status.className = 'message error';
+            updateExportButtons();
+        }
+    }
+
     function showMapsLink() {
         let safeLink = '';
         try {

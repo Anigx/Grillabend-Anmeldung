@@ -1,15 +1,16 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const http = require('node:http');
 const os = require('node:os');
 const path = require('node:path');
 const sqlite3 = require('sqlite3');
 const { createApp } = require('../server');
 const { tokenHash } = require('../src/security');
 
-async function instance(legacyDir) {
+async function instance(legacyDir, options = {}) {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'grillabend-test-'));
-    const { app, db } = await createApp({ dataDir: path.join(root, 'data'), legacyDir: legacyDir || root });
+    const { app, db } = await createApp({ dataDir: path.join(root, 'data'), legacyDir: legacyDir || root, ...options });
     const server = await new Promise(resolve => {
         const listening = app.listen(0, '127.0.0.1', () => resolve(listening));
     });
@@ -18,7 +19,9 @@ async function instance(legacyDir) {
         const headers = {};
         if (body) headers['Content-Type'] = 'application/json';
         if (cookie) headers.Cookie = cookie;
-        if (origin) headers.Origin = origin;
+        if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method) && origin !== '') {
+            headers.Origin = origin ?? `${process.env.NODE_ENV === 'production' ? 'https' : 'http'}://${new URL(base).host}`;
+        }
         if (process.env.NODE_ENV === 'production') headers['X-Forwarded-Proto'] = 'https';
         const response = await fetch(`${base}${route}`, {
             method, headers, body: body ? JSON.stringify(body) : undefined
@@ -54,10 +57,12 @@ test('öffentliche Registrierung erstellt nur Mitglieder, Daten bleiben privat u
         const html = await page.text();
         assert.match(html, /href="\/admin"/);
         assert.doesNotMatch(html, /id="adminForm"/);
-        for (const asset of ['/css/style.css', '/css/modal.css', '/css/admin.css', '/js/app.js', '/js/admin.js',
-            '/vendor/leaflet/leaflet.css', '/vendor/leaflet/leaflet.js']) {
+        for (const asset of ['/css/style.css', '/css/modal.css', '/css/admin.css', '/js/app.js', '/js/admin.js', '/js/admin-exports.js',
+            '/vendor/leaflet/leaflet.css', '/vendor/leaflet/leaflet.js', '/vendor/exceljs/exceljs.min.js',
+            '/vendor/pdf-lib/pdf-lib.min.js', '/vendor/jszip/jszip.min.js']) {
             assert.equal((await fetch(`${app.base}${asset}`)).status, 200, asset);
         }
+        assert.equal((await fetch(`${app.base}/vendor/exceljs/package.json`)).status, 404);
         const created = await app.request('/api/register', 'POST', { username: 'Testperson', password: 'ein-lang-genuges-Testpasswort' });
         assert.equal(created.status, 200);
         assert.equal(created.data.is_admin, false);
@@ -118,6 +123,86 @@ test('Admin wird separat angelegt; Kapazitäten und Bearbeitung fremder Daten si
         assert.equal((await app.request('/api/admin/party-info', 'GET', null, admin.cookie)).status, 401);
         assert.equal((await fetch(`${app.base}/admin`, { headers: { Cookie: admin.cookie } })).status, 401);
     } finally { await app.close(); }
+});
+
+test('Admin-Userübersicht zeigt alle Konten mit Antworten, aber ohne Zugangsdaten', async () => {
+    process.env.ADMIN_USERNAME = 'Organisator';
+    process.env.ADMIN_PASSWORD = 'ein-sicheres-Beispielpasswort';
+    let app;
+    try { app = await instance(); }
+    finally { delete process.env.ADMIN_USERNAME; delete process.env.ADMIN_PASSWORD; }
+    try {
+        assert.equal((await app.request('/api/admin/users')).status, 401);
+        const admin = await app.request('/api/login', 'POST', { username: 'Organisator', password: 'ein-sicheres-Beispielpasswort' });
+        const guest = await app.request('/api/register', 'POST', { username: 'Mara', password: 'ein-lang-genuges-Testpasswort' });
+        const noAnswer = await app.request('/api/register', 'POST', { username: 'Nina', password: 'ein-lang-genuges-Testpasswort' });
+        assert.equal((await app.request('/api/admin/users', 'GET', null, guest.cookie)).status, 403);
+        assert.equal((await app.request('/api/admin/users', 'GET', null, noAnswer.cookie)).status, 403);
+        const empty = await app.request('/api/admin/users', 'GET', null, admin.cookie);
+        assert.equal(empty.cacheControl, 'no-store');
+        assert.deepEqual(empty.data.map(user => [user.username, user.kommt]), [
+            ['Mara', null], ['Nina', null], ['Organisator', null]
+        ]);
+        assert.deepEqual(Object.keys(empty.data[0]).sort(), ['bettgarnitur', 'huette', 'kommt', 'updated_at', 'username'].sort());
+        assert.equal((await app.request('/api/rsvp', 'POST', { kommt: 'Ja', huette: 'Ja', bettgarnitur: 'Ja' }, guest.cookie)).status, 200);
+        const answered = (await app.request('/api/admin/users', 'GET', null, admin.cookie)).data;
+        assert.equal(answered[0].kommt, 'Ja');
+        assert.equal(answered[0].huette, 'Ja');
+        assert.equal(answered[0].bettgarnitur, 'Ja');
+        assert.ok(answered[0].updated_at);
+        assert.equal(answered[1].updated_at, null);
+        const page = await fetch(`${app.base}/admin`, { headers: { Cookie: admin.cookie } });
+        const html = await page.text();
+        assert.match(html, /id="usersTab"/);
+        assert.match(html, /id="usersTableBody"/);
+        assert.doesNotMatch(html, /id="userRoleFilter"|<th scope="col">Rolle<\/th>/);
+        assert.match(html, /src="\/js\/admin-exports.js"/);
+        assert.match(html, /data-export="xlsx"/);
+        assert.match(html, /data-export="csv"/);
+        assert.match(html, /data-export="pdf"/);
+        assert.match(html, /data-export="png"/);
+        assert.equal((await app.request('/api/logout', 'POST', null, admin.cookie)).status, 200);
+        assert.equal((await app.request('/api/admin/users', 'GET', null, admin.cookie)).status, 401);
+    } finally { await app.close(); }
+});
+
+test('Neustart mit geändertem Admin-Passwort rotiert den Hash und widerruft nur Admin-Sitzungen', async () => {
+    const dataRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'grillabend-rotation-'));
+    const previousName = process.env.ADMIN_USERNAME;
+    const previousPassword = process.env.ADMIN_PASSWORD;
+    const dataDir = path.join(dataRoot, 'data');
+    const firstPassword = 'synthetisches-Adminpasswort-1';
+    const nextPassword = 'synthetisches-Adminpasswort-2';
+    let app;
+    try {
+        process.env.ADMIN_USERNAME = 'Auditadmin';
+        process.env.ADMIN_PASSWORD = firstPassword;
+        app = await instance(dataRoot, { dataDir });
+        const admin = await app.request('/api/login', 'POST', { username: 'Auditadmin', password: firstPassword });
+        const member = await app.request('/api/register', 'POST', { username: 'Mitglied', password: 'synthetisches-Mitgliedspasswort' });
+        assert.equal(admin.status, 200);
+        assert.equal(member.status, 200);
+        await app.close();
+        app = null;
+        app = await instance(dataRoot, { dataDir });
+        assert.equal((await app.request('/api/session', 'GET', null, admin.cookie)).data.username, 'Auditadmin');
+        await app.close();
+        app = null;
+
+        process.env.ADMIN_PASSWORD = nextPassword;
+        app = await instance(dataRoot, { dataDir });
+        assert.equal((await app.request('/api/session', 'GET', null, admin.cookie)).data.username, null);
+        assert.equal((await app.request('/api/login', 'POST', { username: 'Auditadmin', password: firstPassword })).status, 401);
+        const rotated = await app.request('/api/login', 'POST', { username: 'Auditadmin', password: nextPassword });
+        assert.equal(rotated.data.is_admin, true);
+        assert.equal((await app.request('/api/session', 'GET', null, member.cookie)).data.username, 'Mitglied');
+        assert.equal((await app.db.get('SELECT COUNT(*) AS count FROM sessions WHERE user_id = (SELECT id FROM users WHERE username = ?)', ['Auditadmin'])).count, 1);
+    } finally {
+        if (app) await app.close();
+        if (previousName === undefined) delete process.env.ADMIN_USERNAME; else process.env.ADMIN_USERNAME = previousName;
+        if (previousPassword === undefined) delete process.env.ADMIN_PASSWORD; else process.env.ADMIN_PASSWORD = previousPassword;
+        fs.rmSync(dataRoot, { recursive: true, force: true });
+    }
 });
 
 function createLegacy(filename, sql) {
@@ -228,19 +313,125 @@ test('Sitzungen: Cookie-Attribute, gehashte Speicherung, Manipulation, Ablauf un
     }
 });
 
+test('abgelaufene Sessions werden entfernt und bestehende Sessions beim Neustart begrenzt', async () => {
+    const dataRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'grillabend-sessions-'));
+    const dataDir = path.join(dataRoot, 'data');
+    let app;
+    try {
+        app = await instance(dataRoot, { dataDir });
+        const first = await app.request('/api/register', 'POST', { username: 'Gast', password: 'synthetisches-Gastpasswort' });
+        await app.db.run('UPDATE sessions SET expires_at = ?', [Date.now() - 1]);
+        assert.equal((await app.request('/api/session', 'GET', null, first.cookie)).data.username, null);
+        const next = await app.request('/api/login', 'POST', { username: 'Gast', password: 'synthetisches-Gastpasswort' });
+        assert.equal(next.status, 200);
+        assert.equal((await app.db.get('SELECT COUNT(*) AS count FROM sessions')).count, 1);
+        await app.db.run('UPDATE sessions SET expires_at = ?', [Date.now() - 1]);
+        await app.close();
+        app = null;
+        app = await instance(dataRoot, { dataDir });
+        assert.equal((await app.db.get('SELECT COUNT(*) AS count FROM sessions')).count, 0);
+        const user = await app.db.get('SELECT id FROM users WHERE username = ?', ['Gast']);
+        for (let i = 0; i < 11; i++) {
+            await app.db.run('INSERT INTO sessions (token_hash, user_id, expires_at) VALUES (?, ?, ?)', [
+                i.toString(16).padStart(64, '0'), user.id, Date.now() + 60000
+            ]);
+        }
+        await app.close();
+        app = null;
+        app = await instance(dataRoot, { dataDir });
+        assert.equal((await app.db.get('SELECT COUNT(*) AS count FROM sessions')).count, 10);
+    } finally {
+        if (app) await app.close();
+        fs.rmSync(dataRoot, { recursive: true, force: true });
+    }
+});
+
+test('ein Konto behält höchstens zehn aktive Sessions', async () => {
+    const app = await instance();
+    try {
+        const initial = await app.request('/api/register', 'POST', { username: 'Gast', password: 'synthetisches-Gastpasswort' });
+        const other = await app.request('/api/register', 'POST', { username: 'Andere', password: 'synthetisches-Weiterespasswort' });
+        let newest;
+        for (let i = 0; i < 10; i++) {
+            newest = await app.request('/api/login', 'POST', { username: 'Gast', password: 'synthetisches-Gastpasswort' });
+            assert.equal(newest.status, 200);
+        }
+        assert.equal((await app.db.get('SELECT COUNT(*) AS count FROM sessions WHERE user_id = (SELECT id FROM users WHERE username = ?)', ['Gast'])).count, 10);
+        assert.equal((await app.request('/api/session', 'GET', null, initial.cookie)).data.username, null);
+        assert.equal((await app.request('/api/session', 'GET', null, newest.cookie)).data.username, 'Gast');
+        assert.equal((await app.request('/api/session', 'GET', null, other.cookie)).data.username, 'Andere');
+    } finally { await app.close(); }
+});
+
 test('fremde und fehlerhafte Origins werden bei schreibenden Anfragen verworfen', async () => {
     const app = await instance();
     try {
         const signed = await app.request('/api/register', 'POST', { username: 'Lio', password: 'ein-lang-genuges-Testpasswort' });
         const body = { kommt: 'Ja', huette: 'Nein', bettgarnitur: 'Nein' };
-        for (const origin of ['https://angreifer.example', 'null', 'kein-url', app.base + '0']) {
+        assert.equal((await app.request('/api/login', 'POST', { username: 'Lio', password: 'ein-lang-genuges-Testpasswort' }, null, '')).status, 403);
+        for (const origin of ['https://angreifer.example', 'null', 'kein-url', app.base + '0',
+            app.base.replace('http:', 'https:'), `${app.base}/pfad`, '']) {
             assert.equal((await app.request('/api/rsvp', 'POST', body, signed.cookie, origin)).status, 403);
         }
+        const crossSite = await fetch(`${app.base}/api/rsvp`, {
+            method: 'POST', headers: { Cookie: signed.cookie, Origin: app.base, 'Sec-Fetch-Site': 'cross-site', 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+        assert.equal(crossSite.status, 403);
+        const sameSite = await fetch(`${app.base}/api/rsvp`, {
+            method: 'POST', headers: { Cookie: signed.cookie, Origin: app.base, 'Sec-Fetch-Site': 'same-site', 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+        assert.equal(sameSite.status, 403);
         assert.equal((await app.db.get('SELECT COUNT(*) AS count FROM rsvps')).count, 0);
         assert.equal((await app.request('/api/rsvp', 'POST', body, signed.cookie, app.base)).status, 200);
         assert.equal((await app.request('/api/rsvp', 'DELETE', null, signed.cookie, 'https://angreifer.example')).status, 403);
         assert.equal((await app.db.get('SELECT COUNT(*) AS count FROM rsvps')).count, 1);
     } finally { await app.close(); }
+});
+
+test('APP_ORIGIN bindet Schreibanfragen an die konfigurierte HTTPS-/Host-/Port-Kombination', async () => {
+    const body = JSON.stringify({ username: 'Lina', password: 'ein-lang-genuges-Testpasswort' });
+    const request = (base, host, origin, forwardedProto) => new Promise((resolve, reject) => {
+        const headers = { Host: host, Origin: origin, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) };
+        if (forwardedProto) headers['X-Forwarded-Proto'] = forwardedProto;
+        const outgoing = http.request(`${base}/api/register`, { method: 'POST', headers }, response => {
+            response.resume(); response.on('end', () => resolve(response.statusCode));
+        });
+        outgoing.on('error', reject);
+        outgoing.end(body);
+    });
+    const previousOrigin = process.env.APP_ORIGIN;
+    process.env.APP_ORIGIN = 'http://veranstaltung.example:8080';
+    let app;
+    try { app = await instance(); }
+    finally {
+        if (previousOrigin === undefined) delete process.env.APP_ORIGIN; else process.env.APP_ORIGIN = previousOrigin;
+    }
+    try {
+        assert.equal(await request(app.base, 'veranstaltung.example:8080', app.base), 403);
+        assert.equal(await request(app.base, new URL(app.base).host, 'http://veranstaltung.example:8080'), 403);
+        assert.equal(await request(app.base, 'veranstaltung.example:8080', 'http://veranstaltung.example'), 403);
+        assert.equal(await request(app.base, 'veranstaltung.example:8080', 'https://veranstaltung.example:8080'), 403);
+        assert.equal((await app.db.get('SELECT COUNT(*) AS count FROM users')).count, 0);
+        assert.equal(await request(app.base, 'veranstaltung.example:8080', 'http://veranstaltung.example:8080'), 200);
+    } finally { await app.close(); }
+    for (const origin of ['null', 'https://example.test/path', 'https://user@example.test', 'ftp://example.test', 'https://example.test/']) {
+        await assert.rejects(createApp({ dataDir: app.root, legacyDir: app.root, origin }), /APP_ORIGIN/);
+    }
+    const original = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'production';
+    let secureApp;
+    try {
+        await assert.rejects(createApp({ dataDir: app.root, legacyDir: app.root, origin: 'http://example.test' }), /APP_ORIGIN/);
+        secureApp = await instance(undefined, { origin: 'https://veranstaltung.example' });
+        assert.equal(await request(secureApp.base, 'veranstaltung.example', 'https://veranstaltung.example'), 426);
+        assert.equal(await request(secureApp.base, 'veranstaltung.example', 'http://veranstaltung.example', 'https'), 403);
+        assert.equal(await request(secureApp.base, 'veranstaltung.example', 'https://veranstaltung.example', 'https'), 200);
+    } finally {
+        if (secureApp) await secureApp.close();
+        if (original === undefined) delete process.env.NODE_ENV; else process.env.NODE_ENV = original;
+    }
 });
 
 test('Admin-API prüft Rolle und Eingaben; fremde RSVP-Änderungen bleiben unmöglich', async () => {
@@ -306,12 +497,12 @@ test('beschädigtes und zu großes JSON wird ohne Datenübernahme zurückgewiese
     const app = await instance();
     try {
         const invalid = await fetch(`${app.base}/api/register`, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{"username":'
+            method: 'POST', headers: { 'Content-Type': 'application/json', Origin: app.base }, body: '{"username":'
         });
         assert.equal(invalid.status, 400);
         assert.equal((await invalid.json()).error, 'Ungültiges JSON.');
         const oversized = await fetch(`${app.base}/api/register`, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            method: 'POST', headers: { 'Content-Type': 'application/json', Origin: app.base },
             body: JSON.stringify({ username: 'Test', password: 'P'.repeat(17000) })
         });
         assert.equal(oversized.status, 413);
