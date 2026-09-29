@@ -39,25 +39,9 @@ jobs:
       - name: Containerstart und HTTPS-Proxy-Prüfung
         shell: bash
         run: |
-          docker run -d --name grillabend-smoke --network host \
+          docker run --rm -i \
             --tmpfs /app/data:rw,uid=1000,gid=1000 \
-            -e APP_ORIGIN=https://127.0.0.1:621 grillabend:smoke
-          ready=0
-          for attempt in $(seq 1 15); do
-            if docker exec grillabend-smoke node -e 'fetch("http://127.0.0.1:621/", {headers: {"X-Forwarded-Proto": "https"}}).then(r => {if (r.status !== 200) process.exitCode = 1}).catch(() => {process.exitCode = 1})'; then
-              ready=1
-              break
-            fi
-            sleep 1
-          done
-          test "$ready" = 1
-          docker exec grillabend-smoke node -e 'fetch("http://127.0.0.1:621/api/session").then(r => {if (r.status !== 426) process.exitCode = 1}).catch(() => {process.exitCode = 1})'
-          docker exec grillabend-smoke node -e 'fetch("http://127.0.0.1:621/api/register", {method: "POST", headers: {"X-Forwarded-Proto": "https", Origin: "https://127.0.0.1:621", "Content-Type": "application/json"}, body: JSON.stringify({username: "SmokeUser", password: "Synthetisches-Passwort123!"})}).then(r => {if (r.status !== 200) {console.error("Registrierung HTTP", r.status); process.exitCode = 1}}).catch(error => {console.error(error); process.exitCode = 1})'
-      - name: Testcontainer entfernen
-        if: always()
-        run: |
-          docker logs grillabend-smoke || true
-          docker rm -f grillabend-smoke || true
+            -e APP_ORIGIN=https://127.0.0.1:621 grillabend:smoke node - < deploy/smoke-image.cjs
 
   publish:
     needs: build
