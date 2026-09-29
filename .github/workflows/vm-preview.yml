@@ -1,0 +1,60 @@
+name: Temporäre Testseite auf GitHub-VM
+
+on:
+  workflow_dispatch:
+    inputs:
+      minuten:
+        description: Wie lange soll die Testseite nach der Bereitstellung erreichbar sein?
+        type: choice
+        options: ['15', '30', '60']
+        default: '30'
+
+permissions:
+  contents: read
+  deployments: write
+
+concurrency:
+  group: grillabend-vm-preview
+  cancel-in-progress: true
+
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 80
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Produktionsimage aus diesem Commit bauen
+        run: docker build -t grillabend:vm-test .
+      - name: Container und temporären HTTPS-Tunnel starten
+        id: site
+        run: bash deploy/preview-vm.sh start
+      - name: Öffentlichen Zugriff und Registrierung prüfen
+        run: bash deploy/preview-vm.sh check '${{ steps.site.outputs.url }}'
+      - name: Geprüften Link als GitHub-Deployment bereitstellen
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PREVIEW_URL: ${{ steps.site.outputs.url }}
+          PREVIEW_MINUTES: ${{ inputs.minuten }}
+        run: |
+          set -euo pipefail
+          id=$(jq -nc --arg ref "$GITHUB_SHA" \
+            '{ref:$ref,environment:"vm-preview",auto_merge:false,required_contexts:[],transient_environment:true,production_environment:false}' \
+            | gh api "repos/$GITHUB_REPOSITORY/deployments" --method POST --input - --jq '.id')
+          printf '%s\n' "$id" > "$RUNNER_TEMP/preview-deployment-id"
+          gh api "repos/$GITHUB_REPOSITORY/deployments/$id/statuses" --method POST \
+            -f state=success -f environment_url="$PREVIEW_URL" \
+            -f log_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            -f description='Temporäre Testseite mit synthetischen Daten' > /dev/null
+          {
+            echo "## [Testseite öffnen]($PREVIEW_URL)"
+            echo "Die Seite läuft nach dem erfolgreichen Test noch $PREVIEW_MINUTES Minuten auf dieser GitHub-VM."
+            echo "Die URL wird danach ungültig; über 'Run workflow' lässt sich eine neue starten."
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "Testseite: $PREVIEW_URL"
+      - name: Testseite erreichbar halten
+        run: sleep "$((${{ inputs.minuten }} * 60))"
+      - name: Testseite und Deployment beenden
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash deploy/preview-vm.sh cleanup
