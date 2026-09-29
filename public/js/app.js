@@ -94,10 +94,17 @@ document.addEventListener('DOMContentLoaded', () => {
         document.title = user ? 'Grillabend – Deine Rückmeldung' : 'Grillabend – Anmeldung';
         if (!user) {
             el('deleteModal').classList.add('hidden');
+            el('showName').checked = false;
+            message('visibilityMessage', '');
+            if (el('settingsDialog').open) el('settingsDialog').close();
             return;
         }
         el('loggedInUser').textContent = user.username;
         el('adminBtn').classList.toggle('hidden', !user.is_admin);
+        el('showName').checked = user.show_name;
+        el('accountManagedNote').classList.toggle('hidden', !user.account_managed);
+        el('usernameForm').classList.toggle('hidden', Boolean(user.account_managed));
+        el('passwordForm').classList.toggle('hidden', Boolean(user.account_managed));
     }
 
     function showParty() {
@@ -130,8 +137,8 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateChoices() {
         if (!user || !party) return;
         const attendance = document.querySelector('input[name="kommt"]:checked')?.value;
-        const existing = attendees.find(row => row.username === user.username);
-        const others = attendees.filter(row => row.username !== user.username && row.kommt === 'Ja');
+        const existing = attendees.find(row => row.is_self === 1);
+        const others = attendees.filter(row => row.is_self !== 1 && row.kommt === 'Ja');
         const cabinFull = others.filter(row => row.huette === 'Ja').length >= party.max_cabin_capacity;
         const bedFull = others.filter(row => row.huette === 'Ja' && row.bettgarnitur === 'Ja').length >= party.max_bettgarnitur;
         const canBook = attendance === 'Ja';
@@ -155,17 +162,17 @@ document.addEventListener('DOMContentLoaded', () => {
         container.append(badge);
     }
 
-    function showAttendees() {
+    function showAttendees(resetForm = true) {
         const list = el('attendeeList');
         list.replaceChildren();
         for (const person of attendees) {
             const item = document.createElement('li');
-            item.className = `attendee-item${person.username === user.username ? ' is-current' : ''}`;
+            item.className = `attendee-item${person.is_self === 1 ? ' is-current' : ''}`;
             const block = document.createElement('div');
             block.className = 'attendee-info';
             const name = document.createElement('span');
             name.className = 'attendee-name';
-            name.textContent = person.username === user.username ? `${person.username} (Du)` : person.username;
+            name.textContent = person.is_self === 1 ? `${person.username} (Du)` : person.username;
             const badges = document.createElement('div');
             badges.className = 'attendee-badges';
             addBadge(badges, person.kommt, person.kommt === 'Ja' ? 'ja' : person.kommt === 'Nein' ? 'nein' : 'vielleicht');
@@ -187,14 +194,16 @@ document.addEventListener('DOMContentLoaded', () => {
         el('count_vielleicht').textContent = attendees.filter(row => row.kommt === 'Vielleicht').length;
         el('count_huette').textContent = `${attendees.filter(row => row.kommt === 'Ja' && row.huette === 'Ja').length}/${party.max_cabin_capacity}`;
         el('count_bettgarnitur').textContent = `${attendees.filter(row => row.kommt === 'Ja' && row.huette === 'Ja' && row.bettgarnitur === 'Ja').length}/${party.max_bettgarnitur}`;
-        const existing = attendees.find(row => row.username === user.username);
+        const existing = attendees.find(row => row.is_self === 1);
         el('deleteBtn').classList.toggle('hidden', !existing);
         el('submitBtn').textContent = existing ? 'Änderungen speichern' : 'Antwort speichern';
-        el('rsvpForm').reset();
-        if (existing) {
-            el(existing.kommt === 'Ja' ? 'kommt_ja' : existing.kommt === 'Nein' ? 'kommt_nein' : 'kommt_vielleicht').checked = true;
-            el(existing.huette === 'Ja' ? 'huette_ja' : 'huette_nein').checked = true;
-            el(existing.bettgarnitur === 'Ja' ? 'bett_ja' : 'bett_nein').checked = true;
+        if (resetForm) {
+            el('rsvpForm').reset();
+            if (existing) {
+                el(existing.kommt === 'Ja' ? 'kommt_ja' : existing.kommt === 'Nein' ? 'kommt_nein' : 'kommt_vielleicht').checked = true;
+                el(existing.huette === 'Ja' ? 'huette_ja' : 'huette_nein').checked = true;
+                el(existing.bettgarnitur === 'Ja' ? 'bett_ja' : 'bett_nein').checked = true;
+            }
         }
         updateChoices();
     }
@@ -235,6 +244,89 @@ document.addEventListener('DOMContentLoaded', () => {
     el('registerModeBtn').addEventListener('click', () => setAuthMode('register'));
     el('password').addEventListener('input', updatePasswordFeedback);
     el('confirmPassword').addEventListener('input', updateConfirmation);
+    const settingsDialog = el('settingsDialog');
+    el('settingsToggle').addEventListener('click', () => {
+        if (!user) return;
+        el('newUsername').value = user.username;
+        for (const id of ['visibilityMessage', 'usernameMessage', 'passwordMessage']) message(id, '');
+        settingsDialog.showModal();
+        el('settingsToggle').setAttribute('aria-expanded', 'true');
+    });
+    el('closeSettings').addEventListener('click', () => settingsDialog.close());
+    settingsDialog.addEventListener('click', event => {
+        if (event.target !== settingsDialog) return;
+        const bounds = settingsDialog.getBoundingClientRect();
+        if (event.clientX < bounds.left || event.clientX > bounds.right ||
+            event.clientY < bounds.top || event.clientY > bounds.bottom) settingsDialog.close();
+    });
+    settingsDialog.addEventListener('close', () => {
+        el('settingsToggle').setAttribute('aria-expanded', 'false');
+        el('usernameForm').reset();
+        el('passwordForm').reset();
+        el('repeatSettingsPassword').setCustomValidity('');
+        if (user) el('settingsToggle').focus();
+    });
+    el('showName').addEventListener('change', async () => {
+        const checkbox = el('showName');
+        const currentUser = user;
+        const showName = checkbox.checked;
+        checkbox.disabled = true;
+        try {
+            const saved = await api('profile/visibility', { method: 'PUT', body: { show_name: showName } });
+            if (user !== currentUser) return;
+            user.show_name = saved.show_name;
+            attendees = await api('attendees');
+            showAttendees(false);
+            message('visibilityMessage', 'Namensanzeige gespeichert.', 'success');
+        } catch (error) {
+            if (user === currentUser) {
+                checkbox.checked = user.show_name;
+                message('visibilityMessage', error.message);
+            }
+        } finally { checkbox.disabled = false; }
+    });
+    el('usernameForm').addEventListener('submit', async event => {
+        event.preventDefault();
+        const button = el('saveUsername');
+        button.disabled = true;
+        try {
+            const changed = await api('profile/username', { method: 'PUT', body: {
+                username: el('newUsername').value.trim(), current_password: el('usernamePassword').value
+            } });
+            user.username = changed.username;
+            el('loggedInUser').textContent = changed.username;
+            el('newUsername').value = changed.username;
+            attendees = await api('attendees');
+            showAttendees(false);
+            message('usernameMessage', 'Benutzername geändert.', 'success');
+        } catch (error) { message('usernameMessage', error.message); }
+        finally {
+            el('usernamePassword').value = '';
+            button.disabled = false;
+        }
+    });
+    el('repeatSettingsPassword').addEventListener('input', () => el('repeatSettingsPassword').setCustomValidity(''));
+    el('newSettingsPassword').addEventListener('input', () => el('repeatSettingsPassword').setCustomValidity(''));
+    el('passwordForm').addEventListener('submit', async event => {
+        event.preventDefault();
+        const confirmation = el('repeatSettingsPassword');
+        confirmation.setCustomValidity(confirmation.value === el('newSettingsPassword').value ? '' : 'Die neuen Passwörter stimmen nicht überein.');
+        if (!el('passwordForm').reportValidity()) return;
+        const button = el('savePassword');
+        button.disabled = true;
+        try {
+            await api('profile/password', { method: 'PUT', body: {
+                current_password: el('currentSettingsPassword').value, new_password: el('newSettingsPassword').value
+            } });
+            el('passwordForm').reset();
+            message('passwordMessage', 'Passwort geändert. Andere Sitzungen wurden beendet.', 'success');
+        } catch (error) {
+            el('currentSettingsPassword').value = '';
+            el('newSettingsPassword').value = '';
+            confirmation.value = '';
+            message('passwordMessage', error.message);
+        } finally { button.disabled = false; }
+    });
     el('logoutBtn').addEventListener('click', async () => {
         try {
             await api('logout', { method: 'POST' });

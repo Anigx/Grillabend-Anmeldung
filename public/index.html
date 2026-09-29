@@ -68,7 +68,10 @@
     <main class="container hidden" id="rsvpContainer">
         <header class="page-intro">
             <div class="user-header">
-                <span id="loggedInUser"></span>
+                <div class="user-identity">
+                    <button id="settingsToggle" class="settings-toggle" type="button" aria-label="Einstellungen öffnen" aria-haspopup="dialog" aria-controls="settingsDialog" aria-expanded="false" title="Einstellungen öffnen"><span aria-hidden="true">⚙</span></button>
+                    <span id="loggedInUser"></span>
+                </div>
                 <div class="header-actions">
                     <a id="adminBtn" class="logout-btn hidden" href="/admin">Admin</a>
                     <button type="button" id="logoutBtn" class="logout-btn">Abmelden</button>
@@ -131,6 +134,45 @@
             <ul id="attendeeList" class="attendee-list"></ul>
         </section>
     </main>
+
+    <dialog id="settingsDialog" class="settings-dialog" aria-labelledby="settingsTitle">
+        <div class="settings-heading">
+            <h2 id="settingsTitle" class="section-title">Einstellungen</h2>
+            <button id="closeSettings" class="settings-close" type="button" aria-label="Einstellungen schließen">×</button>
+        </div>
+        <section class="settings-section" aria-labelledby="visibilityTitle">
+            <h3 id="visibilityTitle">Namensanzeige</h3>
+            <label class="visibility-option" for="showName">
+                <input id="showName" name="show_name" type="checkbox" role="switch" autocomplete="off" aria-describedby="visibilityHint">
+                <span class="visibility-switch-track" aria-hidden="true"><span class="visibility-switch-thumb"></span></span>
+                <span class="visibility-option-text">Meinen Namen in der Teilnehmerliste anzeigen</span>
+            </label>
+            <p id="visibilityHint" class="form-note">Ohne Häkchen steht bei deiner Antwort „Anonym“. Admins sehen deinen Namen weiterhin.</p>
+            <p id="visibilityMessage" class="hidden message" role="status" aria-live="polite"></p>
+        </section>
+        <p id="accountManagedNote" class="hidden settings-managed">Dieses Admin-Konto wird beim Serverstart verwaltet. Benutzername und Passwort dort ändern.</p>
+        <form id="usernameForm" class="settings-section" aria-labelledby="usernameTitle">
+            <h3 id="usernameTitle">Benutzernamen ändern</h3>
+            <label for="newUsername">Neuer Benutzername</label>
+            <input id="newUsername" name="username" type="text" autocomplete="username" spellcheck="false" minlength="2" maxlength="40" required>
+            <label for="usernamePassword">Aktuelles Passwort</label>
+            <input id="usernamePassword" name="current_password" type="password" autocomplete="current-password" required>
+            <button id="saveUsername" class="submit-btn" type="submit">Benutzernamen speichern</button>
+            <p id="usernameMessage" class="hidden message" role="status" aria-live="polite"></p>
+        </form>
+        <form id="passwordForm" class="settings-section" aria-labelledby="passwordTitle">
+            <h3 id="passwordTitle">Passwort ändern</h3>
+            <label for="currentSettingsPassword">Aktuelles Passwort</label>
+            <input id="currentSettingsPassword" name="current_password" type="password" autocomplete="current-password" required>
+            <label for="newSettingsPassword">Neues Passwort</label>
+            <input id="newSettingsPassword" name="new_password" type="password" autocomplete="new-password" minlength="12" aria-describedby="newPasswordHint" required>
+            <p id="newPasswordHint" class="form-note">Mindestens 12 Zeichen mit Groß- und Kleinbuchstaben, Zahl und Sonderzeichen.</p>
+            <label for="repeatSettingsPassword">Neues Passwort wiederholen</label>
+            <input id="repeatSettingsPassword" name="repeat_password" type="password" autocomplete="new-password" required>
+            <button id="savePassword" class="submit-btn" type="submit">Passwort ändern</button>
+            <p id="passwordMessage" class="hidden message" role="status" aria-live="polite"></p>
+        </form>
+    </dialog>
 
     <div id="deleteModal" class="hidden modal-overlay" role="dialog" aria-modal="true" aria-labelledby="deleteTitle">
         <div class="modal-content">

@@ -15,24 +15,63 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: npm
       - run: npm ci
       - run: npm test
 
-  image:
+  build:
     needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          load: true
+          tags: grillabend:smoke
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Containerstart und HTTPS-Proxy-Prüfung
+        shell: bash
+        run: |
+          docker run -d --rm --name grillabend-smoke --network host \
+            --tmpfs /app/data:rw,uid=1000,gid=1000 \
+            -e APP_ORIGIN=https://example.invalid grillabend:smoke
+          curl --retry 15 --retry-delay 1 --retry-connrefused -fsS -o /dev/null \
+            -H 'Host: example.invalid' -H 'X-Forwarded-Proto: https' http://127.0.0.1:621/
+          status=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:621/api/session)
+          test "$status" = 426
+          curl -fsS -o /dev/null -X POST http://127.0.0.1:621/api/register \
+            -H 'Host: example.invalid' -H 'X-Forwarded-Proto: https' \
+            -H 'Origin: https://example.invalid' -H 'Content-Type: application/json' \
+            --data '{"username":"SmokeUser","password":"Synthetisches-Passwort123!"}'
+      - name: Testcontainer entfernen
+        if: always()
+        run: docker rm -f grillabend-smoke || true
+
+  publish:
+    needs: build
+    if: >-
+      (github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')))
+      || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/metadata-action@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - name: Release-Tag muss auf main liegen
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: git merge-base --is-ancestor "$GITHUB_SHA" refs/remotes/origin/main
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
         id: meta
         with:
           images: ghcr.io/${{ github.repository }}
@@ -41,16 +80,15 @@ jobs:
             type=ref,event=tag
             type=sha
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
-      - uses: docker/login-action@v3
-        if: github.event_name != 'pull_request'
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: docker/build-push-action@v6
+      - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: .
-          push: ${{ github.event_name != 'pull_request' }}
+          push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha

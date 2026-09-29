@@ -4,13 +4,15 @@ Die neue Datenbank liegt standardmäßig unter `data/app.sqlite` im Projektverze
 
 | Tabelle | Aufgabe |
 | --- | --- |
-| `users` | eindeutiger Name, `password_hash` mit Salt und scrypt, Admin-Flag |
+| `users` | eindeutiger Name, `password_hash` mit Salt und scrypt, Admin-Flag, `show_name` (0/1; Standard 1) für die freiwillige Namensanzeige |
 | `sessions` | Hash eines zufälligen Session-Tokens, Benutzer-ID und Ablaufzeit |
 | `rsvps` | Name, Teilnahme, Hüttenschlaf, Bettgarnitur, Zeit der Änderung |
 | `party_info` | aktueller Termin (`id = 1`), Adresse, Maps-Link, optionale Koordinaten (`latitude`, `longitude`), Kapazitäten, Regeln und Informationen |
 | `metadata` | Kennzeichnung der abgeschlossenen Alt-Datenübernahme |
 
 Die Tabelle `sessions` hat einen Index auf `expires_at`. Abgelaufene Einträge werden beim Datenbankstart und beim Ausstellen neuer Sitzungen entfernt; beim Start und bei weiteren Logins bleibt die Anzahl aktiver Sessions pro Konto auf zehn begrenzt. Bei einer Passwortrotation des konfigurierten Admin-Kontos aktualisiert `src/server.js` dessen Passwort-Hash und entfernt dessen Sitzungen gemeinsam in einer SQLite-Transaktion.
+
+Ein Konto kann den Benutzernamen nach Passwortprüfung ändern. `src/server.js` reserviert Änderungen an Konten, Sitzungen und Antworten in einer gemeinsamen Prozess-Warteschlange; eine SQLite-Transaktion ändert den Benutzernamen nur bei fehlender case-insensitiver Kollision und passt den dazugehörigen `rsvps.username` an. Sitzungen referenzieren die unveränderte `users.id` und bleiben beim Umbenennen erhalten. Beim Passwortwechsel werden Hash und Session-Widerruf gemeinsam geschrieben: alle bisherigen Sitzungen werden gelöscht und nur für den aktuellen Browser ein neuer Token angelegt. Vor dem Ausstellen einer Login-Sitzung wird der zuvor geprüfte Hash erneut mit dem aktuellen DB-Hash verglichen, damit ein parallel begonnener Login mit altem Passwort nach einer Rotation keinen neuen Token mehr erhält (`src/server.js`, `test/app.test.js`).
 
 Die Admin-Userübersicht verbindet `users` und `rsvps` lesend über den Benutzernamen (ohne Beachtung der Groß-/Kleinschreibung). So bleiben auch Konten ohne RSVP sichtbar; es wird dafür keine zusätzliche Tabelle oder Spalte angelegt. Siehe [[features/administration]].
 
@@ -21,6 +23,8 @@ Beim ersten Start sucht `src/db.js` nach `accounts.sqlite` (`users`), `party_ein
 Fehlt bei einem Alt-Konto ein gültiges Passwort, bricht die Übernahme mit Rollback ab, statt aus einem fehlenden Wert ein erratbares neues Passwort zu erzeugen (`src/db.js`, `test/app.test.js`).
 
 Bei einer bestehenden `data/app.sqlite` ergänzt `src/db.js` fehlende Spalten `latitude`/`longitude` per `ALTER TABLE`, ohne die bisherigen Ortsangaben und Maps-Links zu ändern. Ohne Pin sind beide Werte `NULL`; mit Pin liegen sie in den Bereichen −90 bis 90 bzw. −180 bis 180 und werden vor dem Speichern auf sechs Nachkommastellen gerundet (`src/server.js`). Der Google-Maps-Link wird bei gesetztem Pin serverseitig aus den Koordinaten erzeugt; Mitglieder erhalten beide Werte über `GET /api/party-info`.
+
+Eine bestehende `users`-Tabelle ohne Sichtbarkeitsspalte erhält beim Start `show_name INTEGER NOT NULL DEFAULT 1` (auf 0 oder 1 beschränkt). Für Datenbanken, die bereits eine frühere Spalte mit Standard 0 besitzen, stellt eine transaktionale Migration **einmalig alle Konten** auf 1. Die Markierung `metadata.names_visible_once` verhindert ein erneutes Überschreiben späterer Opt-outs beim Neustart. Neue Registrierungen, Alt-Importe und neu startkonfigurierte Admin-Konten schreiben ebenfalls ausdrücklich 1, auch falls das Schema einer bestehenden Datenbank noch den früheren Standard 0 trägt; Konten, Adminrechte und RSVPs werden bei der Umstellung nicht entfernt oder umbenannt. `PUT /api/profile/visibility` ändert anschließend nur die Spalte des eigenen Kontos. Die Mitgliederliste verbindet RSVPs mit Nutzern und gibt bei ausgeschalteter Anzeige statt des echten Namens „Anonym“ zurück; die Adminliste behält die Namen und Antwortzeitpunkte ([[features/anmeldung-und-teilnahme]], [[api/http-endpunkte]]).
 
 **Wichtig:** Die drei Altdateien und ihre zwischenzeitlichen Kopien sind nach ausdrücklichem Wunsch entfernt; lokal ist nur `data/app.sqlite` als aktueller Bestand vorhanden. Diese Datei wird nicht in Git aufgenommen (`.gitignore`). Das Kennzeichen `metadata.legacy_imported` zeigt nur einen abgeschlossenen Importlauf an und ersetzt keinen Datenabgleich. Bei einem Umzug oder einer Wiederherstellung muss `data/app.sqlite` separat gesichert und übertragen werden; ein Neuaufbau ohne aktuelle Datenbank und ohne Altdateien erzeugt keine bisherigen Konten oder Zusagen.
 

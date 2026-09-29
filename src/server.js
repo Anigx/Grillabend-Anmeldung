@@ -80,7 +80,8 @@ async function createApp(options = {}) {
                 }
             }
         } else {
-            await db.run('INSERT INTO users (username, password_hash, is_admin) VALUES (?, ?, 1)', [adminName.trim(), await hashPassword(adminPassword)]);
+            await db.run('INSERT INTO users (username, password_hash, is_admin, show_name) VALUES (?, ?, 1, 1)',
+                [adminName.trim(), await hashPassword(adminPassword)]);
         }
     }
 
@@ -125,10 +126,18 @@ async function createApp(options = {}) {
         res.set('Set-Cookie', `sid=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${maxAge}${secure}`);
     }
 
+    function sessionToken(req) {
+        return /(?:^|;\s*)sid=([a-f0-9]{64})(?:;|$)/.exec(req.get('cookie') || '')?.[1];
+    }
+
+    function managedAdmin(user) {
+        return Boolean(adminName && user.is_admin === 1 && user.username.toLowerCase() === adminName.trim().toLowerCase());
+    }
+
     async function session(req) {
-        const token = /(?:^|;\s*)sid=([a-f0-9]{64})(?:;|$)/.exec(req.get('cookie') || '')?.[1];
+        const token = sessionToken(req);
         if (!token) return null;
-        return db.get(`SELECT users.id, users.username, users.is_admin FROM sessions
+        return db.get(`SELECT users.id, users.username, users.is_admin, users.show_name FROM sessions
             JOIN users ON users.id = sessions.user_id WHERE sessions.token_hash = ? AND sessions.expires_at > ?`, [tokenHash(token), Date.now()]);
     }
 
@@ -145,21 +154,31 @@ async function createApp(options = {}) {
         next();
     }
 
-    let sessionWrites = Promise.resolve();
+    // Account changes, sessions and bookings share one SQLite connection and write queue.
+    let writes = Promise.resolve();
+    function exclusive(action) {
+        const current = writes.then(action);
+        writes = current.catch(() => {});
+        return current;
+    }
+
     async function issueSession(res, user) {
-        const current = sessionWrites.then(async () => {
+        const issued = await exclusive(async () => {
+            const current = await db.get('SELECT username, password_hash, is_admin, show_name FROM users WHERE id = ?', [user.id]);
+            // A login verified before a concurrent password change must not create a new session afterwards.
+            if (!current || (user.password_hash && current.password_hash !== user.password_hash)) return null;
             const token = randomBytes(32).toString('hex');
             await db.run('DELETE FROM sessions WHERE expires_at <= ?', [Date.now()]);
             await db.run('INSERT INTO sessions (token_hash, user_id, expires_at) VALUES (?, ?, ?)', [tokenHash(token), user.id, Date.now() + SESSION_AGE]);
             await db.run(`DELETE FROM sessions WHERE user_id = ? AND token_hash NOT IN (
                 SELECT token_hash FROM sessions WHERE user_id = ? ORDER BY expires_at DESC, rowid DESC LIMIT ?
             )`, [user.id, user.id, MAX_USER_SESSIONS]);
-            return token;
+            return { token, user: current };
         });
-        sessionWrites = current.catch(() => {});
-        const token = await current;
-        cookie(res, token, SESSION_AGE / 1000);
-        res.json({ username: user.username, is_admin: user.is_admin === 1 });
+        if (!issued) return res.status(401).json({ error: 'Name oder Passwort falsch.' });
+        cookie(res, issued.token, SESSION_AGE / 1000);
+        res.json({ username: issued.user.username, is_admin: issued.user.is_admin === 1,
+            show_name: issued.user.show_name === 1, account_managed: managedAdmin(issued.user) });
     }
 
     // Simple per-IP window for auth writes; persistent throttling can be added once deployment is known.
@@ -185,10 +204,10 @@ async function createApp(options = {}) {
             const name = username.trim();
             const passwordHash = await hashPassword(password);
             // A single SQLite write checks case-insensitive uniqueness atomically, including parallel registrations.
-            const result = await db.run(`INSERT INTO users (username, password_hash, is_admin)
-                SELECT ?, ?, 0 WHERE NOT EXISTS (SELECT 1 FROM users WHERE username = ? COLLATE NOCASE)`, [name, passwordHash, name]);
+            const result = await exclusive(() => db.run(`INSERT INTO users (username, password_hash, is_admin, show_name)
+                SELECT ?, ?, 0, 1 WHERE NOT EXISTS (SELECT 1 FROM users WHERE username = ? COLLATE NOCASE)`, [name, passwordHash, name]));
             if (!result.changes) return res.status(409).json({ error: 'Dieser Name ist bereits vergeben.' });
-            await issueSession(res, { id: result.lastID, username: name, is_admin: 0 });
+            await issueSession(res, { id: result.lastID, password_hash: passwordHash });
         } catch (error) {
             if (error.code === 'SQLITE_CONSTRAINT') return res.status(409).json({ error: 'Dieser Name ist bereits vergeben.' });
             next(error);
@@ -212,15 +231,106 @@ async function createApp(options = {}) {
     app.get('/api/session', async (req, res, next) => {
         try {
             const user = await session(req);
-            res.json(user ? { username: user.username, is_admin: user.is_admin === 1 } : { username: null, is_admin: false });
+            res.json(user ? { username: user.username, is_admin: user.is_admin === 1,
+                show_name: user.show_name === 1, account_managed: managedAdmin(user) }
+                : { username: null, is_admin: false, show_name: false, account_managed: false });
         } catch (error) { next(error); }
     });
 
     app.post('/api/logout', requireUser, async (req, res, next) => {
         try {
-            const token = /(?:^|;\s*)sid=([a-f0-9]{64})(?:;|$)/.exec(req.get('cookie') || '')?.[1];
-            await db.run('DELETE FROM sessions WHERE token_hash = ?', [tokenHash(token)]);
+            await exclusive(() => db.run('DELETE FROM sessions WHERE token_hash = ?', [tokenHash(sessionToken(req))]));
             cookie(res, '', 0);
+            res.json({ success: true });
+        } catch (error) { next(error); }
+    });
+
+    app.put('/api/profile/visibility', requireUser, async (req, res, next) => {
+        try {
+            if (typeof req.body?.show_name !== 'boolean') {
+                return res.status(400).json({ error: 'Ungültige Einstellung zur Namensanzeige.' });
+            }
+            await exclusive(() => db.run('UPDATE users SET show_name = ? WHERE id = ?', [req.body.show_name ? 1 : 0, req.user.id]));
+            res.json({ show_name: req.body.show_name });
+        } catch (error) { next(error); }
+    });
+
+    async function accountForChange(req, currentPassword) {
+        const active = await db.get('SELECT 1 FROM sessions WHERE user_id = ? AND token_hash = ? AND expires_at > ?',
+            [req.user.id, tokenHash(sessionToken(req)), Date.now()]);
+        if (!active) return { status: 401, error: 'Bitte erneut anmelden.' };
+        const account = await db.get('SELECT username, password_hash, is_admin FROM users WHERE id = ?', [req.user.id]);
+        if (!account || !(await verifyPassword(currentPassword, account.password_hash))) {
+            return { status: 422, error: 'Aktuelles Passwort falsch.' };
+        }
+        if (managedAdmin(account)) {
+            return { status: 409, error: 'Dieses Admin-Konto wird über die Serverkonfiguration verwaltet.' };
+        }
+        return { account };
+    }
+
+    app.put('/api/profile/username', requireUser, authLimit, async (req, res, next) => {
+        try {
+            const { username, current_password: currentPassword } = req.body || {};
+            if (typeof username !== 'string' || !/^[\p{L}\p{N} _.-]{2,40}$/u.test(username.trim()) ||
+                typeof currentPassword !== 'string' || !currentPassword) {
+                return res.status(400).json({ error: 'Name: 2–40 Zeichen; aktuelles Passwort erforderlich.' });
+            }
+            const name = username.trim();
+            const outcome = await exclusive(async () => {
+                const checked = await accountForChange(req, currentPassword);
+                if (checked.status) return checked;
+                if (name === checked.account.username) return { status: 400, error: 'Bitte einen anderen Benutzernamen eingeben.' };
+                await db.exec('BEGIN IMMEDIATE');
+                try {
+                    const result = await db.run(`UPDATE users SET username = ? WHERE id = ? AND NOT EXISTS (
+                        SELECT 1 FROM users WHERE id <> ? AND username = ? COLLATE NOCASE
+                    )`, [name, req.user.id, req.user.id, name]);
+                    if (!result.changes) {
+                        await db.exec('ROLLBACK');
+                        return { status: 409, error: 'Dieser Name ist bereits vergeben.' };
+                    }
+                    await db.run('UPDATE rsvps SET username = ? WHERE username = ? COLLATE NOCASE', [name, checked.account.username]);
+                    await db.exec('COMMIT');
+                    return { username: name };
+                } catch (error) {
+                    await db.exec('ROLLBACK');
+                    if (error.code === 'SQLITE_CONSTRAINT') return { status: 409, error: 'Dieser Name ist bereits vergeben.' };
+                    throw error;
+                }
+            });
+            if (outcome.status) return res.status(outcome.status).json({ error: outcome.error });
+            res.json(outcome);
+        } catch (error) { next(error); }
+    });
+
+    app.put('/api/profile/password', requireUser, authLimit, async (req, res, next) => {
+        try {
+            const { current_password: currentPassword, new_password: newPassword } = req.body || {};
+            if (typeof currentPassword !== 'string' || !currentPassword || !validNewPassword(newPassword) ||
+                currentPassword === newPassword) {
+                return res.status(400).json({ error: 'Neues Passwort: mindestens 12 Zeichen mit Groß-/Kleinbuchstaben, Zahl und Sonderzeichen; es muss anders als das alte sein.' });
+            }
+            const outcome = await exclusive(async () => {
+                const checked = await accountForChange(req, currentPassword);
+                if (checked.status) return checked;
+                const passwordHash = await hashPassword(newPassword);
+                const token = randomBytes(32).toString('hex');
+                await db.exec('BEGIN IMMEDIATE');
+                try {
+                    await db.run('UPDATE users SET password_hash = ? WHERE id = ?', [passwordHash, req.user.id]);
+                    await db.run('DELETE FROM sessions WHERE user_id = ?', [req.user.id]);
+                    await db.run('INSERT INTO sessions (token_hash, user_id, expires_at) VALUES (?, ?, ?)',
+                        [tokenHash(token), req.user.id, Date.now() + SESSION_AGE]);
+                    await db.exec('COMMIT');
+                    return { token };
+                } catch (error) {
+                    await db.exec('ROLLBACK');
+                    throw error;
+                }
+            });
+            if (outcome.status) return res.status(outcome.status).json({ error: outcome.error });
+            cookie(res, outcome.token, SESSION_AGE / 1000);
             res.json({ success: true });
         } catch (error) { next(error); }
     });
@@ -231,17 +341,15 @@ async function createApp(options = {}) {
     });
 
     app.get('/api/attendees', requireUser, async (req, res, next) => {
-        try { res.json(await db.all('SELECT username, kommt, huette, bettgarnitur, updated_at FROM rsvps ORDER BY updated_at DESC')); }
+        try {
+            res.json(await db.all(`SELECT CASE WHEN users.show_name = 1 THEN rsvps.username ELSE 'Anonym' END AS username,
+                rsvps.kommt, rsvps.huette, rsvps.bettgarnitur,
+                CASE WHEN users.id = ? THEN 1 ELSE 0 END AS is_self FROM rsvps
+                LEFT JOIN users ON users.username = rsvps.username COLLATE NOCASE
+                ORDER BY rsvps.updated_at DESC`, [req.user.id]));
+        }
         catch (error) { next(error); }
     });
-
-    // Serialize capacity-changing writes on the single SQLite connection.
-    let writes = Promise.resolve();
-    function exclusive(action) {
-        const current = writes.then(action);
-        writes = current.catch(() => {});
-        return current;
-    }
 
     async function adminPartyInfo() {
         const party = await db.get('SELECT * FROM party_info WHERE id = 1');
