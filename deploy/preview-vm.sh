@@ -49,13 +49,22 @@ case "${1:-}" in
     url="${2:?Test-URL fehlt}"
     [[ "$url" =~ ^https://[a-z0-9-]+\.trycloudflare\.com$ ]] || exit 1
     host="${url#https://}"
+    ready=''
     for attempt in $(seq 1 30); do
       if curl --fail --silent --show-error --max-time 10 \
         --header "Host: $host" http://127.0.0.1:8080/ --output /dev/null; then
+        ready=1
         break
       fi
       sleep 2
     done
+    if [[ -z "$ready" ]]; then
+      echo 'Nginx erreicht den Container nicht:' >&2
+      docker compose ps --all || true
+      docker compose logs grillabend || true
+      sudo tail -n 30 /var/log/nginx/error.log || true
+      exit 1
+    fi
     [[ "$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:621/api/session)" == 426 ]]
 
     for attempt in $(seq 1 30); do
