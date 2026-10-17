@@ -38,8 +38,6 @@ case "${1:-}" in
       exit 1
     fi
 
-    printf 'GRILLABEND_BIND=127.0.0.1\nGRILLABEND_HTTP_PORT=1621\nGRILLABEND_IMAGE=grillabend:vm-test\n' > .env
-    chmod 600 .env
     docker compose config --quiet
     docker compose up -d --no-build --pull never
     docker compose ps --all

@@ -16,11 +16,7 @@ fi
 PRIMARY="$1"
 shift || true
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-APP_PORT="${APP_PORT:-}"
-if [[ -z "$APP_PORT" && -f "$PROJECT_DIR/.env" ]]; then
-    APP_PORT="$(sed -n 's/^GRILLABEND_HTTP_PORT=//p' "$PROJECT_DIR/.env" | tail -n 1 | tr -d '\r' | xargs)"
-fi
-APP_PORT="${APP_PORT:-1621}"
+APP_PORT=1621
 CERT_DIR="/etc/nginx/ssl/grillabend"
 CERT="$CERT_DIR/selfsigned.crt"
 KEY="$CERT_DIR/selfsigned.key"

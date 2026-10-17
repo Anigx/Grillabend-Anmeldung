@@ -11,15 +11,13 @@
 Im Projektordner:
 
 ```sh
-cp .env.example .env   # optional: GRILLABEND_BIND/GRILLABEND_HTTP_PORT anpassen
 docker compose pull
 docker compose up -d
 docker compose logs -f grillabend
 ```
 
-- Compose verwendet das veröffentlichte Image `ghcr.io/anigx/grillabend-anmeldung:latest`, den Container `grillabend` und das Volume `grillabend-data`. Node lauscht im Container nur auf **HTTP-Port 80**; veröffentlicht wird standardmäßig `127.0.0.1:1621 → 80`.
-- `GRILLABEND_BIND` (Standard `127.0.0.1`) und `GRILLABEND_HTTP_PORT` (Standard `1621`) steuern das Host-Mapping. `127.0.0.1` bedeutet: nur der lokale Proxy erreicht die App. `0.0.0.0` nur hinter einem vertrauenswürdigen Proxy/VPN verwenden.
-- **Selbstsigniertes HTTPS (Test):** `sudo bash deploy/setup-https-selfsigned.sh <host-oder-ip>` installiert Nginx, erzeugt ein selbstsigniertes Zertifikat, richtet die HTTP→HTTPS-Umleitung ein und proxyt 443 auf `127.0.0.1:<GRILLABEND_HTTP_PORT>`. Einzelheiten zu Nginx-Vorlage, `GRILLABEND_IMAGE` und Volume-Backup stehen unter [Betrieb](betrieb.md).
+- Compose verwendet das veröffentlichte Image `ghcr.io/anigx/grillabend-anmeldung:latest`, den Container `grillabend` und das Volume `grillabend-data`. Node lauscht im Container nur auf **HTTP-Port 80**; veröffentlicht wird `127.0.0.1:1621 → 80`. Alle Werte stehen fest in `compose.yaml`; es gibt keine `.env`.
+- **Selbstsigniertes HTTPS (Test):** `sudo bash deploy/setup-https-selfsigned.sh <host-oder-ip>` installiert Nginx, erzeugt ein selbstsigniertes Zertifikat, richtet die HTTP→HTTPS-Umleitung ein und proxyt 443 auf `127.0.0.1:1621`. Einzelheiten zu Nginx-Vorlage und Volume-Backup stehen unter [Betrieb](betrieb.md).
 - Die App hat keinen Origin-/CSRF-Check und setzt keine `Secure`-Cookies. Sie darf deshalb nicht direkt öffentlich erreichbar sein; TLS und Zugriffsschutz gehören in den vorgelagerten Proxy.
 
 ## Alternative: lokal mit Node
@@ -45,13 +43,12 @@ npm.cmd start
 Dieselbe `compose.yaml` funktioniert unter Docker Desktop, weil sie Portmapping statt Host-Netzwerk nutzt:
 
 ```powershell
-Copy-Item .env.example .env
 docker compose pull
 docker compose up -d
 ```
 
 - Danach <http://127.0.0.1:1621> öffnen. Im Container lauscht Node auf `0.0.0.0:80`, Docker veröffentlicht `127.0.0.1:1621`.
-- Für andere Ports `GRILLABEND_HTTP_PORT` in `.env` ändern; für LAN-Zugriff zusätzlich `GRILLABEND_BIND=0.0.0.0`.
+- Andere Ports oder LAN-Zugriff direkt in `compose.yaml` unter `ports` ändern (z. B. `"0.0.0.0:1621:80"`).
 - Nginx/HTTPS entfällt lokal; für Produktion den Linux-Weg mit `deploy/setup-https-selfsigned.sh` verwenden.
 
 Tests ausführen (verwenden ausschließlich temporäre, künstliche Datenbanken):

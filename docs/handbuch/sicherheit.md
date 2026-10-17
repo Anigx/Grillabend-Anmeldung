@@ -19,8 +19,8 @@ Dieses Dokument beschreibt die Schutzmaßnahmen der Anwendung, den Stand eines s
 - **Kein Mehrinstanz-Schutz:** Kapazitätsprüfungen und Auth-Limits gelten nur innerhalb eines Prozesses. Vor Mehrfachbetrieb wäre eine gemeinsame atomare Reservierung nötig.
 - **Bewusst reduzierte CSRF-Absicherung:** Ohne Origin-Check bleibt nur `SameSite=Lax`. Same-Site-Kontexte (z. B. andere Subdomains) und ältere Browser können Schreibanfragen begünstigen. Die App muss hinter dem Proxy und ohne direkte öffentliche Erreichbarkeit betrieben werden.
 - **Keine `Secure`-Cookies:** Session-Cookies werden auch über HTTPS nicht als `Secure` markiert. Das ist nur akzeptabel, weil TLS am Proxy endet und die App ausschließlich über diesen erreichbar sein soll.
-- **Geheimnisse:** `.env`, Zertifikate und das über die Ersteinrichtung vergebene bzw. per `reset-admin-password` erzeugte Passwort dürfen nie ins Repository. Für Docker Compose die ignorierte `.env` verwenden.
-- **Konfigurationsquelle:** `process.env.*` wird als vertrauenswürdige Betreiber-Eingabe behandelt, nicht als Angreifer-Eingabe.
+- **Geheimnisse:** Zertifikate und das über die Ersteinrichtung vergebene bzw. per `reset-admin-password` erzeugte Passwort dürfen nie ins Repository. Eine `.env` wird von der App nicht verwendet.
+- **Konfigurationsquelle:** `process.env.*` wird als vertrauenswürdige Betreiber-Eingabe behandelt, nicht als Angreifer-Eingabe; die Werte werden in `compose.yaml` fest gesetzt.
 
 ## Schwachstellen-Scan (Stand 2026-10-17)
 

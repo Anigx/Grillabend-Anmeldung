@@ -24,7 +24,7 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Produktionsimage aus diesem Commit bauen
-        run: docker build -t grillabend:vm-test .
+        run: docker build -t ghcr.io/anigx/grillabend-anmeldung:latest .
       - name: Testseite starten, prüfen und erreichbar halten
         env:
           GH_TOKEN: ${{ github.token }}

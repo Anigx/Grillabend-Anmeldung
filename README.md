@@ -19,7 +19,7 @@ Internes Projektwissen (Architektur, Entscheidungen, Datenmodell, Changelog) ste
 
 ## Auf einen Blick
 
-- **Empfohlen: Docker + Reverse Proxy.** Optional `.env` aus `.env.example` erstellen (Standard: `127.0.0.1:1621` → Container `80`), dann `docker compose pull` und `docker compose up -d`. TLS übernimmt ein lokaler Proxy auf 443 (Details: [Betrieb](docs/handbuch/betrieb.md)).
+- **Empfohlen: Docker + Reverse Proxy.** `docker compose pull` und `docker compose up -d` (Mapping fest in `compose.yaml`: `127.0.0.1:1621` → Container `80`). TLS übernimmt ein lokaler Proxy auf 443 (Details: [Betrieb](docs/handbuch/betrieb.md)).
 - **Selbstsigniertes HTTPS (Test):** `sudo bash deploy/setup-https-selfsigned.sh <host-oder-ip>` installiert Nginx, erzeugt ein selbstsigniertes Zertifikat und proxyt 443 auf `127.0.0.1:1621`. Später durch ein echtes Zertifikat ersetzbar.
 - **Lokal mit Node (Alternative):** Node.js ab 22.13, `npm ci --ignore-scripts` und `npm start`, danach <http://127.0.0.1:621> (SQLite kommt aus Node selbst, kein natives npm-Binding). Der Server bindet standardmäßig an `0.0.0.0` (per `HOST` änderbar) und ist damit auch über die Netzwerk-IP erreichbar.
 - **Windows mit Docker Desktop:** gleiche `compose.yaml`; Docker Desktop nutzt Portmapping statt Host-Netzwerk. Danach <http://127.0.0.1:1621> öffnen.

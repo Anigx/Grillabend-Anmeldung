@@ -1,6 +1,6 @@
 # Replace example.invalid and both certificate paths before enabling this config.
 # Nginx terminates HTTPS on the same host as the Node process.
-# The app itself only speaks HTTP; adjust the upstream port if GRILLABEND_HTTP_PORT differs.
+# The app itself only speaks HTTP; the upstream therefore uses the Docker host mapping (127.0.0.1:1621).
 server {
     listen 80;
     server_name example.invalid;

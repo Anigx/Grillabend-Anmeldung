@@ -1,23 +1,19 @@
 # Betrieb
 
-## Umgebungsvariablen
+## Konfiguration
 
-| Variable | Standard | Bedeutung |
-| --- | --- | --- |
-| `GRILLABEND_BIND` | `127.0.0.1` | Host-Adresse für das Portmapping. `0.0.0.0` nur hinter einem vertrauenswürdigen Proxy/VPN verwenden. |
-| `GRILLABEND_HTTP_PORT` | `1621` | Externer HTTP-Port, auf den der Reverse Proxy zeigt; im Container lauscht Node auf `80`. |
-| `GRILLABEND_IMAGE` | GHCR-Image | Optional ein anderes, bereits vorhandenes Image verwenden. |
-| `PORT` / `HOST` / `DATA_DIR` | `80` / `0.0.0.0` / `/app/data` | Werden im Image bzw. in Compose gesetzt; nur für Sonderfälle ändern. |
-| `NODE_ENV` | `production` | Im Image/Compose gesetzt; steuert keine HTTPS-Logik mehr. |
+Alle Werte stehen fest in `compose.yaml` und im Image; es gibt keine `.env`:
 
-Ein Admin-Konto wird nicht mehr über Umgebungsvariablen angelegt, sondern beim ersten Aufruf über die Ersteinrichtung (`/setup`, siehe [Installation](installation.md)).
+| Wert | Festlegung |
+| --- | --- |
+| Host-Mapping | `127.0.0.1:1621` → Container `80` |
+| `NODE_ENV` | `production` |
+| `PORT` | `80` |
+| `HOST` | `0.0.0.0` |
+| `DATA_DIR` | `/app/data` |
+| Image | `ghcr.io/anigx/grillabend-anmeldung:latest` |
 
-Beispiel (`.env` für Compose):
-
-```sh
-GRILLABEND_BIND=127.0.0.1
-GRILLABEND_HTTP_PORT=1621
-```
+Änderungen direkt in `compose.yaml` vornehmen. Ein Admin-Konto wird nicht über Umgebungsvariablen angelegt, sondern beim ersten Aufruf über die Ersteinrichtung (`/setup`, siehe [Installation](installation.md)).
 
 Sitzungen laufen nach sieben Tagen ab; abgelaufene Einträge werden beim Start und beim Ausstellen neuer Sitzungen entfernt, pro Konto bleiben höchstens zehn aktive Sitzungen.
 
@@ -53,7 +49,7 @@ docker exec -it <container> npm run seed-demo-users -- 30
 
 ## HTTP intern, TLS am Reverse Proxy
 
-Die App spricht ausschließlich HTTP. Im Container lauscht Node auf `0.0.0.0:80`; Docker veröffentlicht standardmäßig `127.0.0.1:1621`. Ein lokaler Reverse Proxy terminiert TLS auf 443 und leitet an `127.0.0.1:<GRILLABEND_HTTP_PORT>` weiter.
+Die App spricht ausschließlich HTTP. Im Container lauscht Node auf `0.0.0.0:80`; Docker veröffentlicht `127.0.0.1:1621`. Ein lokaler Reverse Proxy terminiert TLS auf 443 und leitet an `127.0.0.1:1621` weiter.
 
 - Es gibt **keine** HTTPS-Erzwingung (`426`), **keine** `Secure`-Cookies und **keinen** Origin-/CSRF-Check mehr. `SameSite=Lax` bleibt als einzige CSRF-Bremse.
 - Der Proxy setzt `X-Forwarded-For`; die App vertraut Loopback- und privaten Docker-Adressen, damit die Login-Limits pro echter Client-IP gelten.
@@ -68,20 +64,18 @@ Für Tests ohne echtes Zertifikat richtet ein Skript Nginx mit einem selbstsigni
 sudo bash deploy/setup-https-selfsigned.sh <host-oder-ip> [weitere-san...]
 ```
 
-- Installiert bei Bedarf Nginx und OpenSSL, erzeugt das Zertifikat unter `/etc/nginx/ssl/grillabend/` und proxyt Port 443 auf `127.0.0.1:<GRILLABEND_HTTP_PORT>` (Standard 1621).
-- Liest `GRILLABEND_HTTP_PORT` aus `.env`; ohne Eintrag gilt 1621.
+- Installiert bei Bedarf Nginx und OpenSSL, erzeugt das Zertifikat unter `/etc/nginx/ssl/grillabend/` und proxyt Port 443 auf `127.0.0.1:1621`.
 - Leitet `http://…` (Port 80) und `https://…:8443` auf `https://…` (Port 443) um und startet Compose neu.
 - Der Browser zeigt eine Zertifikatswarnung; für ein echtes Zertifikat später die Nginx-Konfiguration aus `deploy/nginx.conf.example` verwenden.
 
 ## Docker und Compose
 
 - Das `Dockerfile` erstellt ein Node-22-Produktionsimage (Debian Trixie slim, per Digest fixiert) mit `npm ci --omit=dev --ignore-scripts`. SQLite stammt aus Node selbst.
-- `compose.yaml` startet das Image im Container `grillabend` mit dem persistenten Volume `grillabend-data` und veröffentlicht Container-Port `80` auf `GRILLABEND_BIND:GRILLABEND_HTTP_PORT` (Standard `127.0.0.1:1621`). Die versionierte `.env.example` enthält alle Angaben kommentiert; `.env` ist die lokale, ignorierte Kopie.
+- `compose.yaml` startet das Image im Container `grillabend` mit dem persistenten Volume `grillabend-data` und veröffentlicht Container-Port `80` fest auf `127.0.0.1:1621`. Alle Werte stehen direkt in `compose.yaml`; eine `.env` wird nicht verwendet.
 - Das `Dockerfile` setzt `PORT=80` und `EXPOSE 80`. Docker erlaubt dem unprivilegierten Benutzer `node` das Binden von 80 im Container; nach außen ist nur der gemappte Port sichtbar.
 - **Windows/Docker Desktop:** dieselbe `compose.yaml` verwenden; Portmapping funktioniert dort ohne Host-Netzwerk.
 
 ```sh
-cp .env.example .env   # optional: Bindung/Port anpassen
 docker compose pull
 docker compose up -d
 docker compose logs -f grillabend

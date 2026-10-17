@@ -1,10 +1,10 @@
 services:
   grillabend:
-    image: ${GRILLABEND_IMAGE:-ghcr.io/anigx/grillabend-anmeldung:latest}
+    image: ghcr.io/anigx/grillabend-anmeldung:latest
     container_name: grillabend
     restart: unless-stopped
     ports:
-      - "${GRILLABEND_BIND:-127.0.0.1}:${GRILLABEND_HTTP_PORT:-1621}:80"
+      - "127.0.0.1:1621:80"
     environment:
       NODE_ENV: production
       PORT: "80"
