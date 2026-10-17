@@ -1,93 +1,34 @@
 # Grillabend-Anmeldung
 
-Webanwendung für einen aktuellen Grillabend: Anmeldung, Zu- und Absagen, Schlafplätze, Bettgarnitur und eine eigene Adminseite für Termin, Ort, Regeln und Informationen. Der visuelle Stil orientiert sich an der importierten Oberfläche. [Projekt-Wiki](docs/wiki/index.md) und [Agent-Regeln](AGENTS.md) beschreiben den belegten Stand und den Pflege-Workflow.
+Webanwendung für einen aktuellen Grillabend: Anmeldung, Zu- und Absagen, Schlafplätze in der Hütte sowie der getrennte Bedarf an **Luftmatratze** und **Bettzeug** – dazu eine Adminseite für Termin, Ort, Kapazitäten, Regeln und Informationen. Der visuelle Stil orientiert sich an der importierten Oberfläche.
 
-## Lokal starten
+## Dokumentation
 
-Voraussetzung: Node.js 22 oder neuer. Im Projektordner `npm install` und `npm start` ausführen, danach lokal `http://127.0.0.1:621` öffnen. Ohne Produktionsmodus bindet der Server an `0.0.0.0` und ist damit bei entsprechender Firewall-Freigabe auch über die IPv4-Adresse des Rechners im Netzwerk erreichbar; Registrierung und HTTP funktionieren dann ebenfalls über diesen Host. Unter PowerShell mit gesperrten Skripten funktioniert auch `npm.cmd install` und `npm.cmd start`. `npm test` führt die automatisierten Tests aus.
+Die Anwender- und Betriebsdokumentation ist bewusst ausgelagert, damit dieses README ein kurzer Einstieg bleibt:
 
-Admin-Konten erreichen den eigenen Bereich über den Link auf der Teilnehmerseite oder unter `/admin`. Oben rechts in der Karte kann ein Ort oder eine Adresse gesucht werden. Ein Suchergebnis zentriert nur die Karte: Den genauen Treffpunkt anschließend anklicken und mit „Änderungen speichern“ übernehmen. Der Pin kann wieder entfernt werden. Der Google-Maps-Link entsteht automatisch aus dem gewählten Pin; bestehende Links ohne Pin bleiben bis zur Änderung erhalten. Die Seite und die Verwaltungs-API erfordern serverseitig geprüfte Adminrechte. `GET /api/admin/party-info` lädt die editierbaren Angaben und Belegung, `PUT /api/admin/party-info` speichert sie. `GET /api/party-info` bleibt die lesbare Veranstaltungsansicht für angemeldete Mitglieder; die frühere Schreibroute `POST /api/party-info` existiert nicht mehr.
+| Thema | Datei |
+| --- | --- |
+| Schnellstart, Voraussetzungen, Admin einrichten | [docs/handbuch/installation.md](docs/handbuch/installation.md) |
+| Bedienung für Gäste und Admins | [docs/handbuch/bedienung.md](docs/handbuch/bedienung.md) |
+| Wichtige Punkte und Gotchas | [docs/handbuch/wichtig-zu-wissen.md](docs/handbuch/wichtig-zu-wissen.md) |
+| Sicherheitsmodell und Schwachstellen-Scan | [docs/handbuch/sicherheit.md](docs/handbuch/sicherheit.md) |
+| Betrieb: Umgebungsvariablen, HTTPS, Docker, Backup | [docs/handbuch/betrieb.md](docs/handbuch/betrieb.md) |
+| Übersicht des Handbuchs | [docs/handbuch/README.md](docs/handbuch/README.md) |
 
-Im Tab „User-Übersicht“ können Admins Konten und Antworten nach Name, Teilnahme, Hüttenschlaf und Bettgarnitur filtern. Die sichtbare Auswahl lässt sich als Excel (`.xlsx`), CSV (`.csv`), PDF (`.pdf`) oder Bild (`.png`; bei sehr vielen Zeilen mehrere PNGs in einer ZIP-Datei) exportieren. Die Dateien werden lokal im Browser aus den Admin-Daten erstellt.
+Internes Projektwissen (Architektur, Entscheidungen, Datenmodell, Changelog) steht getrennt im [Projekt-Wiki](docs/wiki/index.md); die Pflege-Regeln für Coding-Agents in [AGENTS.md](AGENTS.md).
 
-Im Tab „Neuer Grillabend“ öffnet der Button „Alle Antworten zurücksetzen“ ein Warn-Modal zum Zurücksetzen aller bisherigen Teilnahmeantworten einschließlich Hüttenschlaf und Bettgarnitur. Erst nach erneuter Eingabe des eigenen Admin-Passworts werden die Antworten gelöscht. Konten, Passwörter, Sitzungen und Veranstaltungsdaten bleiben bestehen; Datum, Ort und weitere Angaben können im Tab „Veranstaltung“ für den neuen Grillabend bearbeitet werden. Der Vorgang ist nicht rückgängig zu machen.
+## Auf einen Blick
 
-Angemeldete Mitglieder öffnen über das Zahnrad links neben ihrem Benutzernamen einen eigenen Einstellungsdialog. Ein Schiebeschalter steuert die Anzeige ihres Namens in der Teilnehmerliste; nach Eingabe des aktuellen Passworts können sie außerdem Benutzername oder Passwort ändern. Beim Namenswechsel bleiben Antwort und aktive Sitzungen erhalten; beim Passwortwechsel werden die übrigen Sitzungen widerrufen und für den aktuellen Browser ein neues Cookie gesetzt. **Alle Konten werden beim ersten Start dieser Version einmalig auf sichtbar gestellt; neue Registrierungen sind ebenfalls sichtbar.** Wer den Schalter anschließend ausschaltet, bleibt auch nach einem Neustart anonym. Bei ausgeschaltetem Schalter steht in der Liste „Anonym“; Antwort und Platzbelegung bleiben erhalten. Die eigene Antwort wird weiterhin als „Du“ markiert; Admins sehen in der geschützten Übersicht die tatsächlichen Namen. Genaue Antwortzeitpunkte werden nur im Adminbereich ausgegeben. **Die Namensanzeige betrifft nur den Namen:** Durch die weiterhin offene Registrierung können neue Mitglieder die übrigen Teilnahmeangaben und den Veranstaltungsort sehen.
-
-Auf schmalen Handybildschirmen stehen Kontoaktionen und Teilnahmefelder untereinander, während der Einstellungsdialog innerhalb des Sichtfelds scrollbar bleibt. In der Adminansicht liegen Ortssuche und Karte untereinander; die User-Tabelle lässt sich seitlich wischen, um alle Spalten zu sehen. Die Desktop-Kartensuche bleibt als Overlay oben rechts auf der Karte.
+- **Voraussetzung:** Node.js ab 22.13 (SQLite kommt aus Node selbst, kein natives npm-Binding).
+- **Lokal starten:** `npm ci --ignore-scripts` und `npm start`, danach <http://127.0.0.1:621>.
+- **Tests:** `npm test` (ausschließlich temporäre, künstliche Datenbanken).
+- **Ein Abend gleichzeitig** mit offener Registrierung und serverseitigen Sessions.
 
 ## Projektstruktur
 
-- `server.js`: kleiner Startpunkt; `src/server.js`: HTTP-Routen, Sitzungen und Kapazitätslogik.
-- `src/db.js` und `src/security.js`: SQLite-Initialisierung/Alt-Datenübernahme und Passwort-/Token-Funktionen.
-- `public/index.html` und `public/js/app.js`: Anmeldung und Teilnahme; `public/admin.html` und `public/js/admin.js`: Adminoberfläche.
-- `public/css/`: gemeinsamer Stil, Löschdialog und Adminlayout; Leaflet wird für den Karten-Picker aus der installierten Abhängigkeit unter `/vendor/leaflet/` bereitgestellt. `test/`: automatisierte Tests; `docs/wiki/`: Projektwissen.
-- `data/app.sqlite` ist die aktuelle lokale Datenbank, wird nicht über HTTP ausgeliefert und ist von Git ausgeschlossen. Die drei historischen Datenbanken und ihre zwischenzeitliche Sicherung wurden nach geprüftem Import entfernt.
-
-Die Sicherheitstests in `test/security.test.js` und `test/app.test.js` verwenden ausschließlich temporäre Datenbanken und künstliche Zugangsdaten. Sie prüfen insbesondere Sessions, Admin-Passwortrotation, Rechte, Namenssichtbarkeit, Eingabegrenzen, parallele Registrierungen und Buchungen sowie die Alt-Datenübernahme; die lokale `data/app.sqlite` wird dabei nicht verändert.
-
-Beim ersten Start wird `data/app.sqlite` angelegt. Liegen die drei älteren SQLite-Dateien im Projektordner, werden Konten, Zusagen und Veranstaltungsdaten einmalig **lesend** importiert; alte Klartextpasswörter werden dabei gehasht. Im aktuellen lokalen Projekt wurden die Altdateien nach Datenabgleich entfernt; auf Wunsch wurden auch die zwischenzeitlichen Kopien gelöscht. **Für einen Umzug oder eine Wiederherstellung mit vorhandenen Konten und Zusagen muss die aktuelle `data/app.sqlite` separat gesichert und übertragen werden**; ohne sie und ohne Altdateien startet die Anwendung mit einer neuen, leeren Datenbank. Bei bestehenden Installationen ergänzt der Start die Koordinatenspalten in `party_info`; die Namensanzeige aller Konten wird **einmalig** aktiviert, ohne Zusagen oder Ortsangaben zu ändern. Ein Kennzeichen in `metadata` verhindert, dass spätere bewusste Änderungen der Sichtbarkeit beim Neustart zurückgesetzt werden. `data/` und `*.sqlite*` sind von Git ausgeschlossen.
-
-## Admin einrichten
-
-Bei vorhandenen Alt-Daten bleiben Adminrechte aus `accounts.sqlite` erhalten. Für einen frischen Start beide Umgebungsvariablen `ADMIN_USERNAME` und `ADMIN_PASSWORD` vor dem ersten `npm start` setzen (mindestens zwölf Zeichen für das Passwort). Der Server legt damit ein Admin-Konto an; die **erste öffentliche Registrierung erhält keine Adminrechte**. Geheimnisse niemals in versionierte Dateien oder ins Wiki eintragen; für Docker Compose die private, von Git ausgeschlossene `.env` verwenden. Sind die Variablen beim Start nicht gesetzt, ist Registrierung möglich, aber der Adminbereich erst nach Einrichtung eines Administrators verfügbar.
-
-Bei einem bereits vorhandenen Admin-Konto mit diesem Namen prüft der Start das konfigurierte Passwort gegen den gespeicherten Hash. Weicht es ab, wird das Admin-Passwort geändert und **alle bisherigen Sitzungen dieses Admin-Kontos werden ungültig**. Bei unverändertem Passwort bleiben sie gültig; Sitzungen anderer Konten bleiben bei der Rotation erhalten. Zum Wechsel des Admin-Passworts den neuen Wert von `ADMIN_PASSWORD` konfigurieren und den Node-Prozess neu starten. Ist `ADMIN_PASSWORD` später nicht gesetzt, erfolgt keine Rotation. Bei einem vorhandenen Nicht-Admin-Konto mit demselben Namen bricht der Start weiterhin ab.
-
-Ein mit `ADMIN_USERNAME`/`ADMIN_PASSWORD` beim Start verwaltetes Admin-Konto kann Benutzername und Passwort **nicht** im Einstellungsdialog ändern: Ein Neustart würde die Änderung durch die Startkonfiguration überschreiben oder einen zweiten Admin anlegen. Zugangsdaten dieses Kontos wie bisher in der Serverkonfiguration verwalten; die Namensanzeige in der Mitgliederliste bleibt im Dialog einstellbar.
-
-## Einstellungen und Betrieb
-
-- `PORT` (Standard: `621`) und `DATA_DIR` (Standard: `data/` unter dem Projektverzeichnis) können als Umgebungsvariablen gesetzt werden. Ohne Produktionsmodus bindet Node an alle IPv4-Schnittstellen (`0.0.0.0`) und erlaubt HTTP; für einen lokalen Aufruf weiterhin `127.0.0.1` verwenden. In Produktion bindet Node nur an `127.0.0.1` hinter dem HTTPS-Proxy.
-- `APP_ORIGIN` legt die einzige zulässige öffentliche Origin für Schreibanfragen fest (Schema, Host und optional Port, z. B. `http://127.0.0.1:621` lokal oder `https://example.invalid` hinter dem Proxy). Exakt **ohne abschließenden Slash oder Pfad** setzen. In Produktion muss ein gesetzter Wert HTTPS verwenden; die Domain muss mit dem vom Proxy weitergereichten `Host` übereinstimmen. Ohne `APP_ORIGIN` wird die Origin aus dem aktuellen Host und Protokoll der Anfrage abgeleitet. Für die lokale Entwicklung `127.0.0.1` verwenden; die Auflösung von `localhost` auf IPv6 kann je nach System vom IPv4-Listener abweichen. In PowerShell beispielsweise vor dem Start: `$env:APP_ORIGIN = 'http://127.0.0.1:621'` und dann `npm.cmd start`.
-- `NODE_ENV=production` setzt das Session-Cookie auf `Secure`. Für den Betrieb mit einem öffentlichen Host ist HTTPS erforderlich. Die konkrete Hosting-Plattform ist noch nicht festgelegt.
-- Alle Schreibanfragen benötigen einen zur Seiten-Origin passenden `Origin`-Header; Anfragen ohne ihn oder mit fremder Origin werden mit `403` abgewiesen. Browser liefern ihn bei den verwendeten `fetch`-Schreibanfragen automatisch. Auch `Sec-Fetch-Site` wird, wenn vorhanden, auf `same-origin` oder `none` geprüft. Skripte und API-Clients müssen den korrekten `Origin`-Header ausdrücklich mitsenden; `APP_ORIGIN` gibt **keine** Cross-Origin-Freigabe (CORS).
-- Browserdateien aus `public/` werden nur über ausdrücklich definierte Routen ausgeliefert; die Admin-HTML-Seite unter `/admin` nur an Admins. Veranstaltungsdaten und Teilnehmerliste erfordern eine Anmeldung; die eingebettete Google-Karte nutzt bei vorhandenem Pin die gespeicherten Koordinaten, sonst weiterhin die Adresse. Der externe Maps-Link muss eine HTTPS-URL von Google Maps sein.
-- Der klickbare Karten-Picker verwendet Leaflet und OpenStreetMap-Kacheln. Eine bewusst gestartete Suche sendet den eingegebenen Text direkt aus dem Browser an Nominatim (OpenStreetMap); es gibt keine automatische Suche beim Tippen. Für Kacheln und Suche ist eine Internetverbindung erforderlich. Ein Google-Maps-API-Schlüssel wird nicht benötigt. Der Google-Maps-Link wird auf dem Server aus dem gespeicherten Pin erstellt.
-- Öffentliche Registrierung ist gewollt. Neue Passwörter benötigen mindestens zwölf Zeichen, Groß- und Kleinbuchstaben, eine Ziffer und ein Sonderzeichen (kein Leerraum). Eine feste Obergrenze für Passwortzeichen gibt es nicht; die allgemeine JSON-Body-Grenze von `16kb` gilt weiterhin. Im Registrierungsformular muss das Passwort zweimal übereinstimmend eingegeben werden; die Bestätigung bleibt im Browser. Bestehende Konten können sich weiterhin mit ihrem alten Passwort anmelden. Für `ADMIN_PASSWORD` beim Serverstart gilt weiterhin die separate Mindestlänge von zwölf Zeichen.
-- Sessions laufen nach sieben Tagen ab. Abgelaufene Datenbankeinträge werden beim Start und beim Ausstellen neuer Sitzungen entfernt; beim Start und bei weiteren Logins bleiben pro Konto höchstens zehn aktive Sessions, ältere werden entfernt.
-
-## Produktiv nur über HTTPS
-
-Node lauscht auch in Produktion (`NODE_ENV=production`) ausschließlich auf `127.0.0.1` am konfigurierten `PORT` (Standard `621`). Der **lokale Nginx-Reverse-Proxy** übernimmt das vorhandene Zertifikat und leitet HTTPS-Anfragen intern an Node weiter. Die App akzeptiert dann nur Anfragen, bei denen der als `loopback` vertrauenswürdige Proxy `X-Forwarded-Proto: https` setzt; direkte HTTP-Anfragen ohne diesen Nachweis erhalten `426`. Session-Cookies tragen `Secure`. Ohne Produktionsmodus bleibt HTTP für die lokale Entwicklung möglich.
-
-`deploy/nginx.conf.example` zeigt die nötigen Nginx-Einstellungen: Auf Port 80 erfolgt nur eine Weiterleitung zu HTTPS; Port 443 verwendet Zertifikat und Schlüssel, leitet an `127.0.0.1:1621` weiter, setzt `Host` und **überschreibt** `X-Forwarded-Proto` mit `https`. Auf HTTPS-Antworten verhindern `Content-Security-Policy: frame-ancestors 'none'` und `X-Frame-Options: DENY` die Einbettung der eigenen Seite in fremde Frames; die eingebettete Karte bleibt erlaubt. Vor Einsatz Domain und beide **Dateipfade** ersetzen; keine Zertifikate oder privaten Schlüssel ins Repository übernehmen. Die Vorlage ist noch nicht produktiv aktiviert, weil Domain und Pfade noch nicht feststehen. Der Proxy muss auf demselben Host wie Node laufen; für eine andere Topologie ist die Vertrauens- und Bindungskonfiguration neu festzulegen.
-
-Für eine feste öffentliche Domain `APP_ORIGIN` vor dem Start des Node-Prozesses auf deren HTTPS-Origin setzen; der Wert wird nicht durch Nginx gesetzt. Dadurch bleiben Host, Protokoll und Origin der Schreibanfragen an eine Adresse gebunden.
-
-## Docker und GitHub Actions
-
-Das `Dockerfile` erstellt ein Node-22-Produktionsimage auf Debian Trixie slim (auf einen Image-Digest fixiert) mit den per `npm ci --omit=dev` installierten Abhängigkeiten. Trixie stellt die vom nativen `sqlite3`-Modul benötigte glibc-Version bereit; das vorherige Bookworm-Image konnte trotz erfolgreichem Build nicht starten. `.dockerignore` hält lokale Daten, Zugangsdaten und Entwicklungsdateien aus dem Build-Kontext heraus. Lokal bauen: `docker build -t grillabend .` (im Projektverzeichnis).
-
-Für die vorhandene Nginx-Vorlage auf einem **Linux-Host** den Container im Host-Netzwerk starten: Node bleibt dadurch auf `127.0.0.1:1621` erreichbar, und Express vertraut weiterhin nur dem lokalen Proxy. Ein normaler Docker-Port-Forward (`-p`) funktioniert mit diesem Loopback-Listener nicht. Port **621** aus dem isolierten Docker-Netz reicht hier nicht: Er ist auf üblichen Linux-Hosts für den unprivilegierten Benutzer `node` gesperrt (`EACCES` im GitHub-VM-Test). Der Host muss Port 1621 intern halten; nur Nginx stellt HTTPS öffentlich bereit.
-
-Mit `compose.yaml` lässt sich das veröffentlichte Image starten. Die versionierte `.env.example` enthält alle Angaben und Beispiele **auskommentiert mit deutschen Erklärungen**; `.env` ist die lokale, von Git und Docker-Build ausgeschlossene Kopie. Bei einer frischen Installation `.env.example` nach `.env` kopieren (z. B. `cp .env.example .env`), in `.env` mindestens `APP_ORIGIN=https://<öffentliche-domain>` ohne abschließenden Slash aktivieren und bei einer neuen Installation `ADMIN_USERNAME` und `ADMIN_PASSWORD` **zusammen** ausfüllen. Die echte Domain muss zu `deploy/nginx.conf.example` passen; ohne aktives `APP_ORIGIN` verweigert Compose den Start. Compose setzt `NODE_ENV=production`, Port `1621` und den Datenpfad `/app/data` fest; nur `GRILLABEND_IMAGE` kann über `.env` ein anderes bereits vorhandenes Image auswählen. Auf dem Linux-Host:
-
-```sh
-docker compose pull
-docker compose up -d
-docker compose logs -f grillabend
-```
-
-`compose.yaml` verwendet das **bestehende oder neu angelegte** Docker-Volume `grillabend-data`. Bestehende `data/app.sqlite` nicht durch einen Start mit leerem Volume ersetzen: die Datenbank bei gestopptem Server in das Volume übernehmen und die Schreibrechte für UID 1000 sicherstellen. `docker compose down` lässt das Volume bestehen; `docker compose down -v` würde es löschen. Nginx und seine Zertifikate werden auf dem Host eingerichtet, nicht durch Compose gestartet. Der GitHub-VM-Test prüft Compose mit einem lokalen Nginx-Proxy und temporärem HTTPS-Tunnel; eine echte Installation mit produktivem Zertifikat bleibt separat zu prüfen.
-
-```sh
-docker volume create grillabend-data
-docker run -d --name grillabend --restart unless-stopped --network host \
-  --mount type=volume,src=grillabend-data,dst=/app/data \
-  --env-file /pfad/ausserhalb/des/repos/production.env \
-  -e PORT=1621 \
-  ghcr.io/<owner>/<repo>:latest
-```
-
-Die private Env-Datei für den manuellen Start muss `APP_ORIGIN=https://<oeffentliche-domain>` enthalten, passend zum von Nginx durchgereichten `Host`; für die erstmalige Einrichtung eines Admins außerdem `ADMIN_USERNAME` und `ADMIN_PASSWORD` gemeinsam (Passwort mindestens zwölf Zeichen). `NODE_ENV=production` und `DATA_DIR=/app/data` sind bereits im Image gesetzt; sein Port-Standard 621 wird im Host-Netzwerk mit `-e PORT=1621` überschrieben. Nginx wie in `deploy/nginx.conf.example` auf demselben Host betreiben und die Domain sowie Zertifikatspfade dort ersetzen. Weder die ausgefüllte `.env` noch Zertifikate ins Repository legen; nur die auskommentierte `.env.example` wird versioniert.
-
-Das Volume enthält `app.sqlite` und muss bei einem Container-Update wieder eingebunden werden. Bei einem Umzug die vorhandene Datenbank **bei gestopptem Server** in das Volume übertragen und sicherstellen, dass der Containerbenutzer `node` (UID 1000) sie und das Verzeichnis schreiben kann; sonst beginnt die App mit einer neuen, leeren Datenbank. Datenbank und Volume separat sichern.
-
-`.github/workflows/docker.yml` startet bei Pull Requests nach `main`, Pushes nach `main` und Tags `v*` Tests, Image-Build und einen Container-Smoke-Test mit flüchtiger künstlicher SQLite-Datenbank. Der Test läuft im Vordergrund **innerhalb des Images** (`deploy/smoke-image.cjs` wird vom Runner über Standardeingabe übergeben): Er prüft den App-Start mit simuliertem HTTPS-Proxy-Header, die Ablehnung direkter HTTP-Anfragen sowie eine Testregistrierung. Die Verbindung zu einem echten Host-Nginx wird dadurch nicht geprüft. Nur Pushes nach `main`, manuelle Läufe auf `main` und Tags `v*`, die auf einen Commit aus `main` zeigen, veröffentlichen nach `ghcr.io/<owner>/<repo>` mit Branch-/Tag- und Commit-SHA-Tag; `main` erhält zusätzlich `latest`. Ausschließlich der Veröffentlichungsjob hat `packages: write`; alle verwendeten Actions sind auf geprüfte Commit-SHAs fixiert. Das automatisch bereitgestellte `GITHUB_TOKEN` dient zur Veröffentlichung; für den Download privater Images wird ein entsprechender Registry-Zugang auf dem Host benötigt. Image-Name und `<owner>/<repo>` in den Befehlen durch den tatsächlichen GitHub-Pfad in Kleinbuchstaben ersetzen.
-
-### Öffentliche Testseite auf einer GitHub-VM
-
-In GitHub Actions den Workflow **„Temporäre Testseite auf GitHub-VM“** über „Run workflow“ starten, oder per GitHub CLI `gh workflow run vm-preview.yml --ref main` ausführen. Der Workflow baut das Produktionsimage aus dem gewählten Commit und startet es per `docker compose` auf einer **kurzlebigen Ubuntu-VM** mit leerem Test-Volume. Ein nur lokal erreichbarer Nginx-Proxy und ein temporärer Cloudflare-HTTPS-Tunnel stellen eine zufällige `trycloudflare.com`-Adresse bereit. Der öffentliche Abruf, die geschützte API, HTTPS-Cookies und eine Registrierung mit **ausschließlich künstlichen Daten** werden geprüft. Danach erscheint der geprüfte Webseiten-Link im Laufprotokoll, der Job-Zusammenfassung und unter den GitHub-Deployments (`vm-preview`). Standardmäßig bleibt die Seite nach Bereitstellung 30 Minuten erreichbar; beim Start sind 15, 30 oder 60 Minuten wählbar. Sobald der Job endet, ist auch der Link ungültig; ein neuer Lauf erzeugt eine neue Adresse. Für eine dauerhaft erreichbare Webseite wird stattdessen eine eigene VM mit Domain und Nginx benötigt. Keine echte `.env`, lokale Datenbank oder vorhandenen Konten werden in den Test übernommen.
-
-Die auf ExcelJS beschränkte npm-Überschreibung löst die installierte `uuid`-Abhängigkeit als Version 11.1.1 statt der von ExcelJS verlangten älteren Hauptversion auf. Der Excel-Export ist mit dieser Node-Abhängigkeit getestet. **Der Browser lädt allerdings das von ExcelJS vorgefertigte `exceljs.min.js`: dessen bereits eingebündelte Bibliotheken werden durch npm-Overrides nicht neu gebaut.** Der aktuell geprüfte Exportpfad verwendet die von der Advisory betroffenen gepufferten UUID-Funktionen nicht; bei späteren ExcelJS-Updates die Überschreibung und das Browser-Bundle erneut prüfen. Das native SQLite-Modul benötigt weiterhin sein Installationsskript beim Bauen des Images.
+- `server.js` – kleiner Startpunkt; `src/server.js` – HTTP-Routen, Sitzungen und Kapazitätslogik.
+- `src/db.js`, `src/security.js`, `src/auth-limit.js` – SQLite-Initialisierung/Alt-Import, Passwort-/Token-Funktionen und Auth-Limits.
+- `public/` – `index.html`/`js/app.js` (Anmeldung und Teilnahme), `admin.html`/`js/admin.js` (Adminoberfläche), `css/`.
+- `test/` – automatisierte Tests.
+- `docs/handbuch/` – Anwender-/Betriebsdoku; `docs/wiki/` – internes Projektwissen.
+- `data/app.sqlite` – lokale Datenbank (nicht über HTTP ausgeliefert, von Git ausgeschlossen).

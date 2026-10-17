@@ -140,7 +140,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const existing = attendees.find(row => row.is_self === 1);
         const others = attendees.filter(row => row.is_self !== 1 && row.kommt === 'Ja');
         const cabinFull = others.filter(row => row.huette === 'Ja').length >= party.max_cabin_capacity;
-        const bedFull = others.filter(row => row.huette === 'Ja' && row.bettgarnitur === 'Ja').length >= party.max_bettgarnitur;
+        const luftFull = others.filter(row => row.huette === 'Ja' && row.luftmatratze === 'Ja').length >= party.max_luftmatratze;
+        const bettzeugFull = others.filter(row => row.huette === 'Ja' && row.bettzeug === 'Ja').length >= party.max_bettzeug;
         const canBook = attendance === 'Ja';
         el('huette_ja').disabled = !canBook || (cabinFull && existing?.huette !== 'Ja');
         el('huette_nein').disabled = !canBook;
@@ -149,10 +150,13 @@ document.addEventListener('DOMContentLoaded', () => {
         el('cabinGroup').classList.toggle('disabled-group', !canBook);
         if (!canBook) el('huette_nein').checked = true;
         const sleeps = canBook && el('huette_ja').checked;
-        el('bettgarniturGroup').classList.toggle('hidden', !sleeps);
-        el('bett_ja').disabled = !sleeps || (bedFull && existing?.bettgarnitur !== 'Ja');
-        el('bettVollHint').classList.toggle('hidden', !bedFull);
-        if (!sleeps) el('bett_nein').checked = true;
+        el('luftmatratzeGroup').classList.toggle('hidden', !sleeps);
+        el('bettzeugGroup').classList.toggle('hidden', !sleeps);
+        el('luftmatratze_ja').disabled = !sleeps || (luftFull && existing?.luftmatratze !== 'Ja');
+        el('bettzeug_ja').disabled = !sleeps || (bettzeugFull && existing?.bettzeug !== 'Ja');
+        el('luftmatratzeVollHint').classList.toggle('hidden', !luftFull);
+        el('bettzeugVollHint').classList.toggle('hidden', !bettzeugFull);
+        if (!sleeps) { el('luftmatratze_nein').checked = true; el('bettzeug_nein').checked = true; }
     }
 
     function addBadge(container, label, color) {
@@ -178,7 +182,8 @@ document.addEventListener('DOMContentLoaded', () => {
             addBadge(badges, person.kommt, person.kommt === 'Ja' ? 'ja' : person.kommt === 'Nein' ? 'nein' : 'vielleicht');
             if (person.kommt === 'Ja' && person.huette === 'Ja') {
                 addBadge(badges, '🛏️ Hütte', 'huette');
-                if (person.bettgarnitur === 'Ja') addBadge(badges, '🛌 Bettgarnitur', 'huette');
+                if (person.luftmatratze === 'Ja') addBadge(badges, '🛌 Luftmatratze', 'huette');
+                if (person.bettzeug === 'Ja') addBadge(badges, '🧺 Bettzeug', 'huette');
             }
             block.append(name, badges);
             item.append(block);
@@ -193,7 +198,8 @@ document.addEventListener('DOMContentLoaded', () => {
         el('count_ja').textContent = attendees.filter(row => row.kommt === 'Ja').length;
         el('count_vielleicht').textContent = attendees.filter(row => row.kommt === 'Vielleicht').length;
         el('count_huette').textContent = `${attendees.filter(row => row.kommt === 'Ja' && row.huette === 'Ja').length}/${party.max_cabin_capacity}`;
-        el('count_bettgarnitur').textContent = `${attendees.filter(row => row.kommt === 'Ja' && row.huette === 'Ja' && row.bettgarnitur === 'Ja').length}/${party.max_bettgarnitur}`;
+        el('count_luftmatratze').textContent = `${attendees.filter(row => row.kommt === 'Ja' && row.huette === 'Ja' && row.luftmatratze === 'Ja').length}/${party.max_luftmatratze}`;
+        el('count_bettzeug').textContent = `${attendees.filter(row => row.kommt === 'Ja' && row.huette === 'Ja' && row.bettzeug === 'Ja').length}/${party.max_bettzeug}`;
         const existing = attendees.find(row => row.is_self === 1);
         el('deleteBtn').classList.toggle('hidden', !existing);
         el('submitBtn').textContent = existing ? 'Änderungen speichern' : 'Antwort speichern';
@@ -202,7 +208,8 @@ document.addEventListener('DOMContentLoaded', () => {
             if (existing) {
                 el(existing.kommt === 'Ja' ? 'kommt_ja' : existing.kommt === 'Nein' ? 'kommt_nein' : 'kommt_vielleicht').checked = true;
                 el(existing.huette === 'Ja' ? 'huette_ja' : 'huette_nein').checked = true;
-                el(existing.bettgarnitur === 'Ja' ? 'bett_ja' : 'bett_nein').checked = true;
+                el(existing.luftmatratze === 'Ja' ? 'luftmatratze_ja' : 'luftmatratze_nein').checked = true;
+                el(existing.bettzeug === 'Ja' ? 'bettzeug_ja' : 'bettzeug_nein').checked = true;
             }
         }
         updateChoices();
@@ -349,9 +356,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!kommt) return message('rsvpMessage', 'Bitte Teilnahme wählen.');
         const huette = kommt === 'Ja' ? document.querySelector('input[name="huette"]:checked')?.value : 'Nein';
         if (!huette) return message('rsvpMessage', 'Bitte Hüttenschlaf wählen.');
-        const bettgarnitur = huette === 'Ja' && el('bett_ja').checked ? 'Ja' : 'Nein';
+        const luftmatratze = huette === 'Ja' && el('luftmatratze_ja').checked ? 'Ja' : 'Nein';
+        const bettzeug = huette === 'Ja' && el('bettzeug_ja').checked ? 'Ja' : 'Nein';
         try {
-            await api('rsvp', { method: 'POST', body: { kommt, huette, bettgarnitur } });
+            await api('rsvp', { method: 'POST', body: { kommt, huette, luftmatratze, bettzeug } });
             await reload();
             message('rsvpMessage', 'Eintrag gespeichert.', 'success');
         } catch (error) { message('rsvpMessage', error.message); }

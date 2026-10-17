@@ -63,7 +63,8 @@
                 <h2>Kapazitäten</h2>
                 <div class="admin-two-columns">
                     <div class="form-group"><label for="adminMaxCabin">Max. Schlafplätze</label><input type="number" id="adminMaxCabin" min="1" max="1000" required></div>
-                    <div class="form-group"><label for="adminMaxBett">Max. Bettgarnituren</label><input type="number" id="adminMaxBett" min="0" max="1000" required></div>
+                    <div class="form-group"><label for="adminMaxLuft">Max. Luftmatratzen</label><input type="number" id="adminMaxLuft" min="0" max="1000" required></div>
+                    <div class="form-group"><label for="adminMaxBettzeug">Max. Bettzeug</label><input type="number" id="adminMaxBettzeug" min="0" max="1000" required></div>
                 </div>
 
                 <h2>Hinweise für Mitglieder</h2>
@@ -78,7 +79,8 @@
                     <h2>Belegung</h2>
                     <div class="admin-stats">
                         <div class="stat-box"><span id="usedCabin">–</span> Hüttenschlafplätze</div>
-                        <div class="stat-box"><span id="usedBedding">–</span> Bettgarnituren</div>
+                        <div class="stat-box"><span id="usedLuft">–</span> Luftmatratzen</div>
+                        <div class="stat-box"><span id="usedBettzeug">–</span> Bettzeug</div>
                     </div>
                     <p class="form-note">Eine Kapazität kann nicht unter die bereits belegten Plätze gesenkt werden.</p>
                 </section>
@@ -113,7 +115,8 @@
                 <div><label for="userNameFilter">Name</label><input id="userNameFilter" type="search" placeholder="Name suchen" autocomplete="off"></div>
                 <div><label for="userAttendanceFilter">Teilnahme</label><select id="userAttendanceFilter"><option value="">Alle</option><option value="Ja">Ja</option><option value="Nein">Nein</option><option value="Vielleicht">Vielleicht</option><option value="none">Keine Antwort</option></select></div>
                 <div><label for="userCabinFilter">Hüttenschlaf</label><select id="userCabinFilter"><option value="">Alle</option><option value="Ja">Ja</option><option value="Nein">Nein</option><option value="none">Keine Antwort</option></select></div>
-                <div><label for="userBeddingFilter">Bettgarnitur</label><select id="userBeddingFilter"><option value="">Alle</option><option value="Ja">Ja</option><option value="Nein">Nein</option><option value="none">Keine Antwort</option></select></div>
+                <div><label for="userLuftFilter">Luftmatratze</label><select id="userLuftFilter"><option value="">Alle</option><option value="Ja">Ja</option><option value="Nein">Nein</option><option value="none">Keine Antwort</option></select></div>
+                <div><label for="userBettzeugFilter">Bettzeug</label><select id="userBettzeugFilter"><option value="">Alle</option><option value="Ja">Ja</option><option value="Nein">Nein</option><option value="none">Keine Antwort</option></select></div>
                 <button id="resetUsersFilters" type="button" class="logout-btn">Filter zurücksetzen</button>
             </form>
             <p id="usersMessage" class="form-note" role="status" aria-live="polite">Lade User …</p>
@@ -124,7 +127,8 @@
                         <th scope="col">User <button type="button" class="column-help" data-help="username" aria-label="Erklärung zu User anzeigen" aria-expanded="false" aria-controls="columnHelpTooltip">?</button></th>
                         <th scope="col">Teilnahme <button type="button" class="column-help" data-help="kommt" aria-label="Erklärung zu Teilnahme anzeigen" aria-expanded="false" aria-controls="columnHelpTooltip">?</button></th>
                         <th scope="col">Hüttenschlaf <button type="button" class="column-help" data-help="huette" aria-label="Erklärung zu Hüttenschlaf anzeigen" aria-expanded="false" aria-controls="columnHelpTooltip">?</button></th>
-                        <th scope="col">Bettgarnitur <button type="button" class="column-help" data-help="bettgarnitur" aria-label="Erklärung zu Bettgarnitur anzeigen" aria-expanded="false" aria-controls="columnHelpTooltip">?</button></th>
+                        <th scope="col">Luftmatratze <button type="button" class="column-help" data-help="luftmatratze" aria-label="Erklärung zu Luftmatratze anzeigen" aria-expanded="false" aria-controls="columnHelpTooltip">?</button></th>
+                        <th scope="col">Bettzeug <button type="button" class="column-help" data-help="bettzeug" aria-label="Erklärung zu Bettzeug anzeigen" aria-expanded="false" aria-controls="columnHelpTooltip">?</button></th>
                         <th scope="col">Antwort vom <button type="button" class="column-help" data-help="updated_at" aria-label="Erklärung zu Antwort vom anzeigen" aria-expanded="false" aria-controls="columnHelpTooltip">?</button></th>
                     </tr></thead>
                     <tbody id="usersTableBody"></tbody>
@@ -141,7 +145,7 @@
     <dialog id="resetDialog" class="reset-dialog" aria-labelledby="resetDialogTitle" aria-describedby="resetDialogWarning">
         <form id="resetForm">
             <h2 id="resetDialogTitle">Alle Antworten zurücksetzen?</h2>
-            <p id="resetDialogWarning" class="reset-warning"><strong>Achtung: Alle bisherigen Teilnahmeantworten werden unwiderruflich gelöscht.</strong> Auch Angaben zu Hüttenschlaf und Bettgarnitur gehen verloren. Alle User müssen für den nächsten Grillabend erneut antworten. Benutzerkonten und Passwörter bleiben erhalten.</p>
+            <p id="resetDialogWarning" class="reset-warning"><strong>Achtung: Alle bisherigen Teilnahmeantworten werden unwiderruflich gelöscht.</strong> Auch Angaben zu Hüttenschlaf, Luftmatratze und Bettzeug gehen verloren. Alle User müssen für den nächsten Grillabend erneut antworten. Benutzerkonten und Passwörter bleiben erhalten.</p>
             <div class="form-group">
                 <label for="resetPassword">Admin-Passwort zur Bestätigung</label>
                 <input id="resetPassword" name="password" type="password" autocomplete="current-password" aria-describedby="resetDialogError" required>

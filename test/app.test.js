@@ -4,9 +4,10 @@ const fs = require('node:fs');
 const http = require('node:http');
 const os = require('node:os');
 const path = require('node:path');
-const sqlite3 = require('sqlite3');
+const { DatabaseSync } = require('node:sqlite');
 const { createApp } = require('../server');
 const { tokenHash } = require('../src/security');
+const { scryptSync } = require('node:crypto');
 
 async function instance(legacyDir, options = {}) {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'grillabend-test-'));
@@ -59,8 +60,10 @@ test('öffentliche Registrierung erstellt nur Mitglieder, Daten bleiben privat u
         assert.doesNotMatch(html, /id="adminForm"/);
         for (const asset of ['/css/style.css', '/css/modal.css', '/css/admin.css', '/js/app.js', '/js/admin.js', '/js/admin-exports.js',
             '/vendor/leaflet/leaflet.css', '/vendor/leaflet/leaflet.js', '/vendor/exceljs/exceljs.min.js',
-            '/vendor/pdf-lib/pdf-lib.min.js', '/vendor/jszip/jszip.min.js']) {
-            assert.equal((await fetch(`${app.base}${asset}`)).status, 200, asset);
+            '/vendor/pdfmake/pdfmake.min.js', '/vendor/jszip/jszip.min.js']) {
+            const response = await fetch(`${app.base}${asset}`);
+            assert.equal(response.status, 200, asset);
+            assert.ok((await response.arrayBuffer()).byteLength > 0, asset);
         }
         assert.equal((await fetch(`${app.base}/vendor/exceljs/package.json`)).status, 404);
         const created = await app.request('/api/register', 'POST', { username: 'Testperson', password: 'ein-lang-genuges-Testpasswort1' });
@@ -74,12 +77,12 @@ test('öffentliche Registrierung erstellt nur Mitglieder, Daten bleiben privat u
         assert.equal((await app.request('/api/admin/party-info', 'PUT', {}, created.cookie)).status, 403);
         assert.equal((await app.request('/api/admin/party-info', 'GET', null, created.cookie)).status, 403);
         assert.equal((await fetch(`${app.base}/admin`, { headers: { Cookie: created.cookie } })).status, 403);
-        assert.equal((await app.request('/api/rsvp', 'POST', { kommt: 'Ja', huette: 'Ja', bettgarnitur: 'Nein', username: 'Admin' })).status, 401);
-        assert.equal((await app.request('/api/rsvp', 'POST', { kommt: 'Ja', huette: 'Nein', bettgarnitur: 'Nein' }, created.cookie, 'https://attacker.example')).status, 403);
-        const saved = await app.request('/api/rsvp', 'POST', { kommt: 'Ja', huette: 'Ja', bettgarnitur: 'Nein', username: 'Admin' }, created.cookie);
+        assert.equal((await app.request('/api/rsvp', 'POST', { kommt: 'Ja', huette: 'Ja', luftmatratze: 'Nein', bettzeug: 'Nein', username: 'Admin' })).status, 401);
+        assert.equal((await app.request('/api/rsvp', 'POST', { kommt: 'Ja', huette: 'Nein', luftmatratze: 'Nein', bettzeug: 'Nein' }, created.cookie, 'https://attacker.example')).status, 403);
+        const saved = await app.request('/api/rsvp', 'POST', { kommt: 'Ja', huette: 'Ja', luftmatratze: 'Nein', bettzeug: 'Nein', username: 'Admin' }, created.cookie);
         assert.equal(saved.status, 200);
         assert.deepEqual((await app.request('/api/attendees', 'GET', null, created.cookie)).data[0], {
-            username: 'Testperson', kommt: 'Ja', huette: 'Ja', bettgarnitur: 'Nein', is_self: 1
+            username: 'Testperson', kommt: 'Ja', huette: 'Ja', luftmatratze: 'Nein', bettzeug: 'Nein', is_self: 1
         });
         assert.equal((await app.request('/api/logout', 'POST', null, created.cookie)).status, 200);
         assert.equal((await app.request('/api/attendees', 'GET', null, created.cookie)).status, 401);
@@ -97,7 +100,7 @@ test('Namensanzeige ist freiwillig, Änderungen wirken nur für das eigene Konto
         const alice = await app.request('/api/register', 'POST', { username: 'Alice', password: 'ein-lang-genuges-Testpasswort1' });
         const bob = await app.request('/api/register', 'POST', { username: 'Bob', password: 'ein-lang-genuges-Testpasswort1' });
         assert.equal((await app.request('/api/session', 'GET', null, alice.cookie)).data.show_name, true);
-        const answer = { kommt: 'Ja', huette: 'Nein', bettgarnitur: 'Nein' };
+        const answer = { kommt: 'Ja', huette: 'Nein', luftmatratze: 'Nein', bettzeug: 'Nein' };
         assert.equal((await app.request('/api/rsvp', 'POST', answer, alice.cookie)).status, 200);
         assert.equal((await app.request('/api/rsvp', 'POST', answer, bob.cookie)).status, 200);
         const initial = await app.request('/api/attendees', 'GET', null, bob.cookie);
@@ -137,9 +140,9 @@ test('Benutzername lässt sich nur nach Passwortprüfung eindeutig ändern; eige
     try {
         const alice = await app.request('/api/register', 'POST', { username: 'Alice', password: 'Gutes-Passwort123!' });
         const bob = await app.request('/api/register', 'POST', { username: 'Bob', password: 'Anderes-Passwort123!' });
-        const answer = { kommt: 'Ja', huette: 'Ja', bettgarnitur: 'Nein' };
+        const answer = { kommt: 'Ja', huette: 'Ja', luftmatratze: 'Nein', bettzeug: 'Nein' };
         assert.equal((await app.request('/api/rsvp', 'POST', answer, alice.cookie)).status, 200);
-        const original = await app.db.get('SELECT updated_at FROM rsvps WHERE username = ?', ['Alice']);
+        const original = await app.db.get('SELECT user_id, updated_at FROM rsvps');
         const route = '/api/profile/username';
         assert.equal((await app.request(route, 'PUT', { username: 'Neuer Name', current_password: 'Gutes-Passwort123!' })).status, 401);
         assert.equal((await app.request(route, 'PUT', { username: 'Neuer Name', current_password: 'Gutes-Passwort123!' }, alice.cookie, 'https://fremd.example')).status, 403);
@@ -149,10 +152,10 @@ test('Benutzername lässt sich nur nach Passwortprüfung eindeutig ändern; eige
         const renamed = await app.request(route, 'PUT', { username: 'Neuer Name', current_password: 'Gutes-Passwort123!', user_id: 999 }, alice.cookie);
         assert.deepEqual(renamed.data, { username: 'Neuer Name' });
         assert.equal((await app.request('/api/session', 'GET', null, alice.cookie)).data.username, 'Neuer Name');
-        assert.deepEqual(await app.db.get('SELECT username, updated_at FROM rsvps'), { username: 'Neuer Name', updated_at: original.updated_at });
+        assert.deepEqual(await app.db.get('SELECT user_id, updated_at FROM rsvps'), original);
         assert.equal((await app.request('/api/login', 'POST', { username: 'Alice', password: 'Gutes-Passwort123!' })).status, 401);
         assert.equal((await app.request('/api/login', 'POST', { username: 'Neuer Name', password: 'Gutes-Passwort123!' })).status, 200);
-        assert.equal((await app.request('/api/rsvp', 'POST', { ...answer, bettgarnitur: 'Ja' }, alice.cookie)).status, 200);
+        assert.equal((await app.request('/api/rsvp', 'POST', { ...answer, luftmatratze: 'Ja', bettzeug: 'Ja' }, alice.cookie)).status, 200);
         assert.equal((await app.db.get('SELECT COUNT(*) AS count FROM rsvps')).count, 1);
         assert.equal((await app.request('/api/session', 'GET', null, bob.cookie)).data.username, 'Bob');
     } finally { await app.close(); }
@@ -229,7 +232,7 @@ test('Admin wird separat angelegt; Kapazitäten und Bearbeitung fremder Daten si
         assert.equal(admin.data.is_admin, true);
         const party = {
             date: 'Samstag 19 Uhr', location_name: 'Hütte', location_address: 'Berlin', maps_url: 'https://maps.google.com/',
-            max_cabin_capacity: 1, max_bettgarnitur: 1, rules: 'Seid freundlich.', info: 'Essen mitbringen.'
+            max_cabin_capacity: 1, max_luftmatratze: 1, max_bettzeug: 1, rules: 'Seid freundlich.', info: 'Essen mitbringen.'
         };
         const adminPage = await fetch(`${app.base}/admin`, { headers: { Cookie: admin.cookie } });
         assert.equal(adminPage.status, 200);
@@ -238,7 +241,7 @@ test('Admin wird separat angelegt; Kapazitäten und Bearbeitung fremder Daten si
         assert.match(adminHtml, /src="\/js\/admin.js"/);
         assert.match(adminHtml, /id="pinMap"/);
         assert.match(adminHtml, /src="\/vendor\/leaflet\/leaflet.js"/);
-        assert.deepEqual((await app.request('/api/admin/party-info', 'GET', null, admin.cookie)).data.occupancy, { cabin: 0, bedding: 0 });
+        assert.deepEqual((await app.request('/api/admin/party-info', 'GET', null, admin.cookie)).data.occupancy, { cabin: 0, luftmatratze: 0, bettzeug: 0 });
         assert.equal((await app.request('/api/admin/party-info', 'PUT', party, admin.cookie, 'https://angreifer.example')).status, 403);
         assert.equal((await app.request('/api/admin/party-info', 'PUT', party, admin.cookie)).status, 200);
         const guest = await app.request('/api/register', 'POST', { username: 'Gast 1', password: 'langes-Beispielpasswort-1' });
@@ -247,14 +250,14 @@ test('Admin wird separat angelegt; Kapazitäten und Bearbeitung fremder Daten si
         assert.equal(publicInfo.rules, party.rules);
         assert.equal(Object.hasOwn(publicInfo, 'occupancy'), false);
         assert.equal((await app.request('/api/party-info', 'POST', party, admin.cookie)).status, 404);
-        assert.equal((await app.request('/api/rsvp', 'POST', { kommt: 'Ja', huette: 'Ja', bettgarnitur: 'Ja' }, guest.cookie)).status, 200);
-        assert.deepEqual((await app.request('/api/admin/party-info', 'GET', null, admin.cookie)).data.occupancy, { cabin: 1, bedding: 1 });
+        assert.equal((await app.request('/api/rsvp', 'POST', { kommt: 'Ja', huette: 'Ja', luftmatratze: 'Ja', bettzeug: 'Ja' }, guest.cookie)).status, 200);
+        assert.deepEqual((await app.request('/api/admin/party-info', 'GET', null, admin.cookie)).data.occupancy, { cabin: 1, luftmatratze: 1, bettzeug: 1 });
         const other = await app.request('/api/register', 'POST', { username: 'Gast 2', password: 'langes-Beispielpasswort-2' });
-        assert.equal((await app.request('/api/rsvp', 'POST', { kommt: 'Ja', huette: 'Ja', bettgarnitur: 'Nein' }, other.cookie)).status, 409);
+        assert.equal((await app.request('/api/rsvp', 'POST', { kommt: 'Ja', huette: 'Ja', luftmatratze: 'Nein', bettzeug: 'Nein' }, other.cookie)).status, 409);
         assert.equal((await app.request('/api/rsvp/Gast%201', 'DELETE', null, other.cookie)).status, 404);
         assert.equal((await app.request('/api/admin/party-info', 'PUT', { ...party, max_cabin_capacity: 0 }, admin.cookie)).status, 400);
         assert.equal((await app.request('/api/rsvp', 'DELETE', null, guest.cookie)).status, 200);
-        assert.equal((await app.request('/api/rsvp', 'POST', { kommt: 'Ja', huette: 'Ja', bettgarnitur: 'Nein' }, other.cookie)).status, 200);
+        assert.equal((await app.request('/api/rsvp', 'POST', { kommt: 'Ja', huette: 'Ja', luftmatratze: 'Nein', bettzeug: 'Nein' }, other.cookie)).status, 200);
         assert.equal((await app.request('/api/logout', 'POST', null, admin.cookie)).status, 200);
         assert.equal((await app.request('/api/admin/party-info', 'GET', null, admin.cookie)).status, 401);
         assert.equal((await fetch(`${app.base}/admin`, { headers: { Cookie: admin.cookie } })).status, 401);
@@ -279,12 +282,13 @@ test('Admin-Userübersicht zeigt alle Konten mit Antworten, aber ohne Zugangsdat
         assert.deepEqual(empty.data.map(user => [user.username, user.kommt]), [
             ['Mara', null], ['Nina', null], ['Organisator', null]
         ]);
-        assert.deepEqual(Object.keys(empty.data[0]).sort(), ['bettgarnitur', 'huette', 'kommt', 'updated_at', 'username'].sort());
-        assert.equal((await app.request('/api/rsvp', 'POST', { kommt: 'Ja', huette: 'Ja', bettgarnitur: 'Ja' }, guest.cookie)).status, 200);
+        assert.deepEqual(Object.keys(empty.data[0]).sort(), ['bettzeug', 'huette', 'kommt', 'luftmatratze', 'updated_at', 'username'].sort());
+        assert.equal((await app.request('/api/rsvp', 'POST', { kommt: 'Ja', huette: 'Ja', luftmatratze: 'Ja', bettzeug: 'Ja' }, guest.cookie)).status, 200);
         const answered = (await app.request('/api/admin/users', 'GET', null, admin.cookie)).data;
         assert.equal(answered[0].kommt, 'Ja');
         assert.equal(answered[0].huette, 'Ja');
-        assert.equal(answered[0].bettgarnitur, 'Ja');
+        assert.equal(answered[0].luftmatratze, 'Ja');
+        assert.equal(answered[0].bettzeug, 'Ja');
         assert.ok(answered[0].updated_at);
         assert.equal(answered[1].updated_at, null);
         const page = await fetch(`${app.base}/admin`, { headers: { Cookie: admin.cookie } });
@@ -314,17 +318,18 @@ test('Neuer Grillabend setzt nur Antworten nach erneuter Admin-Passwortprüfung 
         const other = await app.request('/api/register', 'POST', { username: 'Nina', password: 'ein-lang-genuges-Testpasswort2' });
         const party = {
             date: 'Samstag', location_name: 'Hütte', location_address: 'Berlin', maps_url: '',
-            max_cabin_capacity: 2, max_bettgarnitur: 1, rules: 'Regeln', info: 'Informationen'
+            max_cabin_capacity: 2, max_luftmatratze: 1, max_bettzeug: 1, rules: 'Regeln', info: 'Informationen'
         };
         assert.equal((await app.request('/api/admin/party-info', 'PUT', party, admin.cookie)).status, 200);
-        assert.equal((await app.request('/api/rsvp', 'POST', { kommt: 'Ja', huette: 'Ja', bettgarnitur: 'Ja' }, guest.cookie)).status, 200);
-        assert.equal((await app.request('/api/rsvp', 'POST', { kommt: 'Nein', huette: 'Nein', bettgarnitur: 'Nein' }, other.cookie)).status, 200);
+        assert.equal((await app.request('/api/rsvp', 'POST', { kommt: 'Ja', huette: 'Ja', luftmatratze: 'Ja', bettzeug: 'Ja' }, guest.cookie)).status, 200);
+        assert.equal((await app.request('/api/rsvp', 'POST', { kommt: 'Nein', huette: 'Nein', luftmatratze: 'Nein', bettzeug: 'Nein' }, other.cookie)).status, 200);
         const page = await fetch(`${app.base}/admin`, { headers: { Cookie: admin.cookie } });
         const html = await page.text();
         assert.match(html, /id="resetTab"/);
         assert.match(html, /id="resetDialog"/);
         assert.match(html, /id="resetPassword" name="password" type="password"/);
         const route = '/api/admin/reset-rsvps';
+        await app.db.run("INSERT INTO rsvps_legacy_names VALUES ('Archivierter Testname', 'Ja', 'Nein', 'Nein', 'Nein', '2026-01-01')");
         const correct = { password: 'ein-sicheres-Beispielpasswort' };
         assert.equal((await app.request(route, 'POST', correct)).status, 401);
         assert.equal((await app.request(route, 'POST', correct, guest.cookie)).status, 403);
@@ -332,21 +337,23 @@ test('Neuer Grillabend setzt nur Antworten nach erneuter Admin-Passwortprüfung 
         assert.equal((await app.request(route, 'POST', {}, admin.cookie)).status, 400);
         assert.equal((await app.request(route, 'POST', { password: 'falsch' }, admin.cookie)).status, 422);
         assert.equal((await app.request('/api/attendees', 'GET', null, guest.cookie)).data.length, 2);
+        assert.equal((await app.db.get('SELECT COUNT(*) AS count FROM rsvps_legacy_names')).count, 1);
         const reset = await app.request(route, 'POST', correct, admin.cookie);
         assert.deepEqual(reset.data, { success: true, deleted: 2 });
         assert.equal(reset.cacheControl, 'no-store');
         assert.deepEqual((await app.request('/api/attendees', 'GET', null, guest.cookie)).data, []);
+        assert.equal((await app.db.get('SELECT COUNT(*) AS count FROM rsvps_legacy_names')).count, 0);
         const people = (await app.request('/api/admin/users', 'GET', null, admin.cookie)).data;
         assert.deepEqual(people.map(person => person.username), ['Mara', 'Nina', 'Organisator']);
-        assert.ok(people.every(person => person.kommt === null && person.huette === null && person.bettgarnitur === null && person.updated_at === null));
+        assert.ok(people.every(person => person.kommt === null && person.huette === null && person.luftmatratze === null && person.bettzeug === null && person.updated_at === null));
         const info = (await app.request('/api/admin/party-info', 'GET', null, admin.cookie)).data;
         assert.equal(info.date, party.date);
         assert.equal(info.rules, party.rules);
-        assert.deepEqual(info.occupancy, { cabin: 0, bedding: 0 });
+        assert.deepEqual(info.occupancy, { cabin: 0, luftmatratze: 0, bettzeug: 0 });
         assert.equal((await app.request('/api/session', 'GET', null, guest.cookie)).data.username, 'Mara');
         assert.equal((await app.request('/api/login', 'POST', { username: 'Nina', password: 'ein-lang-genuges-Testpasswort2' })).status, 200);
         assert.deepEqual((await app.request(route, 'POST', correct, admin.cookie)).data, { success: true, deleted: 0 });
-        assert.equal((await app.request('/api/rsvp', 'POST', { kommt: 'Ja', huette: 'Ja', bettgarnitur: 'Ja' }, guest.cookie)).status, 200);
+        assert.equal((await app.request('/api/rsvp', 'POST', { kommt: 'Ja', huette: 'Ja', luftmatratze: 'Ja', bettzeug: 'Ja' }, guest.cookie)).status, 200);
     } finally { await app.close(); }
 });
 
@@ -390,10 +397,9 @@ test('Neustart mit geändertem Admin-Passwort rotiert den Hash und widerruft nur
 });
 
 function createLegacy(filename, sql) {
-    return new Promise((resolve, reject) => {
-        const db = new sqlite3.Database(filename);
-        db.exec(sql, error => db.close(closeError => error || closeError ? reject(error || closeError) : resolve()));
-    });
+    const db = new DatabaseSync(filename);
+    try { db.exec(sql); }
+    finally { db.close(); }
 }
 
 test('Alt-Daten werden einmalig und ohne Änderung der Quell-Dateien übernommen', async () => {
@@ -560,7 +566,7 @@ test('fremde und fehlerhafte Origins werden bei schreibenden Anfragen verworfen'
     const app = await instance();
     try {
         const signed = await app.request('/api/register', 'POST', { username: 'Lio', password: 'ein-lang-genuges-Testpasswort1' });
-        const body = { kommt: 'Ja', huette: 'Nein', bettgarnitur: 'Nein' };
+        const body = { kommt: 'Ja', huette: 'Nein', luftmatratze: 'Nein', bettzeug: 'Nein' };
         assert.equal((await app.request('/api/login', 'POST', { username: 'Lio', password: 'ein-lang-genuges-Testpasswort1' }, null, '')).status, 403);
         for (const origin of ['https://angreifer.example', 'null', 'kein-url', app.base + '0',
             app.base.replace('http:', 'https:'), `${app.base}/pfad`, '']) {
@@ -636,7 +642,7 @@ test('Admin-API prüft Rolle und Eingaben; fremde RSVP-Änderungen bleiben unmö
     try {
         const admin = await app.request('/api/login', 'POST', { username: 'Admin', password: 'ein-lang-genuges-Testpasswort' });
         const guest = await app.request('/api/register', 'POST', { username: 'Gaby', password: 'ein-lang-genuges-Testpasswort1' });
-        const fields = { date: 'Samstag', location_name: 'Hütte', location_address: 'Ort', maps_url: 'https://maps.google.com/', max_cabin_capacity: 1, max_bettgarnitur: 1, rules: 'Regeln', info: 'Info' };
+        const fields = { date: 'Samstag', location_name: 'Hütte', location_address: 'Ort', maps_url: 'https://maps.google.com/', max_cabin_capacity: 1, max_luftmatratze: 1, max_bettzeug: 1, rules: 'Regeln', info: 'Info' };
         assert.equal((await app.request('/api/admin/party-info', 'PUT', { ...fields, username: 'Admin', is_admin: true }, guest.cookie)).status, 403);
         for (const value of ['javascript:alert(1)', 'https://google.com.evil.example/maps', 'http://maps.google.com/', 'https://maps.google.com@evil.example/']) {
             assert.equal((await app.request('/api/admin/party-info', 'PUT', { ...fields, maps_url: value }, admin.cookie)).status, 400);
@@ -645,13 +651,13 @@ test('Admin-API prüft Rolle und Eingaben; fremde RSVP-Änderungen bleiben unmö
         assert.equal((await app.request('/api/admin/party-info', 'PUT', { ...fields, max_cabin_capacity: 1.5 }, admin.cookie)).status, 400);
         assert.equal((await app.request('/api/party-info', 'GET', null, admin.cookie)).data.location_name, '');
         assert.equal((await app.request('/api/admin/party-info', 'PUT', fields, admin.cookie)).status, 200);
-        assert.equal((await app.request('/api/rsvp', 'POST', { kommt: 'Vielleicht', huette: 'Ja', bettgarnitur: 'Ja' }, guest.cookie)).status, 400);
-        assert.equal((await app.request('/api/rsvp', 'POST', { kommt: 'Ja', huette: 'Nein', bettgarnitur: 'Ja' }, guest.cookie)).status, 400);
-        const saved = await app.request('/api/rsvp', 'POST', { kommt: 'Ja', huette: 'Ja', bettgarnitur: 'Ja', username: 'Admin' }, guest.cookie);
+        assert.equal((await app.request('/api/rsvp', 'POST', { kommt: 'Vielleicht', huette: 'Ja', luftmatratze: 'Ja', bettzeug: 'Ja' }, guest.cookie)).status, 400);
+        assert.equal((await app.request('/api/rsvp', 'POST', { kommt: 'Ja', huette: 'Nein', luftmatratze: 'Ja', bettzeug: 'Ja' }, guest.cookie)).status, 400);
+        const saved = await app.request('/api/rsvp', 'POST', { kommt: 'Ja', huette: 'Ja', luftmatratze: 'Ja', bettzeug: 'Ja', username: 'Admin' }, guest.cookie);
         assert.equal(saved.status, 200);
-        assert.equal((await app.request('/api/admin/party-info', 'PUT', { ...fields, max_bettgarnitur: 0 }, admin.cookie)).status, 409);
+        assert.equal((await app.request('/api/admin/party-info', 'PUT', { ...fields, max_luftmatratze: 0 }, admin.cookie)).status, 409);
         assert.equal((await app.request('/api/rsvp', 'DELETE', { username: 'Admin' }, admin.cookie)).status, 200);
-        assert.equal((await app.db.get('SELECT username FROM rsvps')).username, 'Gaby');
+        assert.equal((await app.db.get('SELECT users.username FROM rsvps JOIN users ON users.id = rsvps.user_id')).username, 'Gaby');
     } finally { await app.close(); }
 });
 
@@ -663,11 +669,11 @@ test('bei gleichzeitigem RSVP gewinnt höchstens ein Benutzer den letzten freien
     finally { delete process.env.ADMIN_USERNAME; delete process.env.ADMIN_PASSWORD; }
     try {
         const admin = await app.request('/api/login', 'POST', { username: 'Admin', password: 'ein-lang-genuges-Testpasswort' });
-        const config = { date: '', location_name: '', location_address: '', maps_url: '', max_cabin_capacity: 1, max_bettgarnitur: 1, rules: '', info: '' };
+        const config = { date: '', location_name: '', location_address: '', maps_url: '', max_cabin_capacity: 1, max_luftmatratze: 1, max_bettzeug: 1, rules: '', info: '' };
         assert.equal((await app.request('/api/admin/party-info', 'PUT', config, admin.cookie)).status, 200);
         const a = await app.request('/api/register', 'POST', { username: 'Erster', password: 'ein-lang-genuges-Testpasswort1' });
         const b = await app.request('/api/register', 'POST', { username: 'Zweiter', password: 'ein-lang-genuges-Testpasswort1' });
-        const body = { kommt: 'Ja', huette: 'Ja', bettgarnitur: 'Ja' };
+        const body = { kommt: 'Ja', huette: 'Ja', luftmatratze: 'Ja', bettzeug: 'Ja' };
         const results = await Promise.all([a.cookie, b.cookie].map(cookie => app.request('/api/rsvp', 'POST', body, cookie)));
         assert.deepEqual(results.map(row => row.status).sort(), [200, 409]);
         assert.equal((await app.db.get("SELECT COUNT(*) AS count FROM rsvps WHERE huette = 'Ja' AND kommt = 'Ja'")).count, 1);
@@ -715,11 +721,11 @@ test('unvollständige Alt-Passwörter werden nicht als berechenbare neue Passwö
             INSERT INTO users VALUES ('B', NULL, 1);`);
         await assert.rejects(createApp({ dataDir: path.join(root, 'data'), legacyDir: legacy }), /Passwort|password/i);
         const file = path.join(root, 'data', 'app.sqlite');
-        const target = new sqlite3.Database(file, sqlite3.OPEN_READONLY);
+        const target = new DatabaseSync(file, { readOnly: true });
         try {
-            const row = await new Promise((resolve, reject) => target.get('SELECT COUNT(*) AS count FROM users', (error, result) => error ? reject(error) : resolve(result)));
+            const row = target.prepare('SELECT COUNT(*) AS count FROM users').get();
             assert.equal(row.count, 0);
-        } finally { await new Promise(resolve => target.close(resolve)); }
+        } finally { target.close(); }
     } finally {
         fs.rmSync(root, { recursive: true, force: true });
         fs.rmSync(legacy, { recursive: true, force: true });
@@ -736,7 +742,7 @@ test('Admin setzt und entfernt einen Karten-Pin; der Google-Link wird aus Koordi
         const admin = await app.request('/api/login', 'POST', { username: 'Kartenadmin', password: 'ein-lang-genuges-Testpasswort' });
         const guest = await app.request('/api/register', 'POST', { username: 'Gast', password: 'ein-lang-genuges-Testpasswort1' });
         const fields = { date: 'Heute', location_name: 'Treffpunkt', location_address: 'Berlin', maps_url: 'https://maps.google.com/',
-            max_cabin_capacity: 15, max_bettgarnitur: 10, rules: '', info: '' };
+            max_cabin_capacity: 15, max_luftmatratze: 10, max_bettzeug: 10, rules: '', info: '' };
         const legacyLink = await app.request('/api/admin/party-info', 'PUT', fields, admin.cookie);
         assert.equal(legacyLink.data.maps_url, fields.maps_url);
         assert.equal(legacyLink.data.latitude, null);
@@ -795,6 +801,31 @@ test('bestehende Datenbank erhält Koordinatenspalten ohne Verlust der Ortsdaten
     } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
 
+test('bestehende Bettgarnitur-Spalte wird beim Start auf Luftmatratze und Bettzeug aufgeteilt', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'grillabend-bedding-'));
+    const dataDir = path.join(root, 'data');
+    fs.mkdirSync(dataDir);
+    try {
+        await createLegacy(path.join(dataDir, 'app.sqlite'), `
+            CREATE TABLE users (id INTEGER PRIMARY KEY, username TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL, is_admin INTEGER NOT NULL DEFAULT 0, show_name INTEGER NOT NULL DEFAULT 1);
+            INSERT INTO users VALUES (1, 'Bestand', 'synthetischer-Althash', 0, 1);
+            CREATE TABLE rsvps (user_id INTEGER PRIMARY KEY, kommt TEXT NOT NULL, huette TEXT NOT NULL, bettgarnitur TEXT NOT NULL DEFAULT 'Nein', updated_at TEXT NOT NULL);
+            INSERT INTO rsvps VALUES (1, 'Ja', 'Ja', 'Ja', '2026-01-01');
+            CREATE TABLE party_info (id INTEGER PRIMARY KEY, date TEXT NOT NULL, location_name TEXT NOT NULL, location_address TEXT NOT NULL, maps_url TEXT NOT NULL, max_cabin_capacity INTEGER NOT NULL, max_bettgarnitur INTEGER NOT NULL, rules TEXT NOT NULL, info TEXT NOT NULL);
+            INSERT INTO party_info VALUES (1, 'Termin', 'Ort', 'Adresse', '', 15, 4, '', '');`);
+        const { db } = await createApp({ dataDir, legacyDir: root });
+        try {
+            assert.deepEqual(await db.get('SELECT luftmatratze, bettzeug FROM rsvps WHERE user_id = 1'), { luftmatratze: 'Ja', bettzeug: 'Ja' });
+            const rsvpColumns = await db.all('PRAGMA table_info(rsvps)');
+            assert.equal(rsvpColumns.some(column => column.name === 'bettgarnitur'), false);
+            assert.equal(rsvpColumns.filter(column => ['luftmatratze', 'bettzeug'].includes(column.name)).length, 2);
+            assert.deepEqual(await db.get('SELECT max_luftmatratze, max_bettzeug FROM party_info WHERE id = 1'), { max_luftmatratze: 4, max_bettzeug: 4 });
+            const partyColumns = await db.all('PRAGMA table_info(party_info)');
+            assert.equal(partyColumns.some(column => column.name === 'max_bettgarnitur'), false);
+        } finally { await db.close(); }
+    } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
 test('einmalige Namensmigration aktiviert bestehende Konten und überschreibt späteres Ausschalten nicht', async () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'grillabend-sichtbarkeit-'));
     const dataDir = path.join(root, 'data');
@@ -825,4 +856,170 @@ test('einmalige Namensmigration aktiviert bestehende Konten und überschreibt sp
             assert.equal((await restarted.db.get('SELECT show_name FROM users WHERE username = ?', ['NeuerAdmin'])).show_name, 1);
         } finally { await restarted.db.close(); }
     } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
+test('paralleler Namenswechsel und RSVP behalten dieselbe Benutzer-ID und nur einen Schlafplatz', async () => {
+    const app = await instance();
+    try {
+        const password = 'Kuenstliches-Racepasswort123!';
+        const alice = await app.request('/api/register', 'POST', { username: 'RaceAlice', password });
+        await app.db.run('UPDATE party_info SET max_cabin_capacity = 1, max_luftmatratze = 1, max_bettzeug = 1');
+        const answer = { kommt: 'Ja', huette: 'Ja', luftmatratze: 'Ja', bettzeug: 'Ja' };
+        assert.equal((await app.request('/api/rsvp', 'POST', answer, alice.cookie)).status, 200);
+        const original = await app.db.get('SELECT user_id FROM rsvps');
+        const get = app.db.get.bind(app.db);
+        let signal;
+        const reauthStarted = new Promise(resolve => { signal = resolve; });
+        app.db.get = async (sql, params) => {
+            const row = await get(sql, params);
+            if (sql === 'SELECT username, password_hash, is_admin FROM users WHERE id = ?') signal();
+            return row;
+        };
+        const renaming = app.request('/api/profile/username', 'PUT', { username: 'RaceBob', current_password: password }, alice.cookie);
+        await reauthStarted;
+        const [renamed, saved] = await Promise.all([renaming, app.request('/api/rsvp', 'POST', answer, alice.cookie)]);
+        app.db.get = get;
+        assert.equal(renamed.status, 200);
+        assert.equal(saved.status, 200);
+        assert.deepEqual(await app.db.all('SELECT user_id FROM rsvps'), [original]);
+        const reused = await app.request('/api/register', 'POST', { username: 'RaceAlice', password: 'Anderes-Racepasswort123!' });
+        const attendees = (await app.request('/api/attendees', 'GET', null, reused.cookie)).data;
+        assert.equal(attendees.length, 1);
+        assert.equal(attendees[0].username, 'RaceBob');
+        assert.equal(attendees[0].is_self, 0);
+        await app.request('/api/rsvp', 'DELETE', null, reused.cookie);
+        assert.equal((await app.db.get('SELECT COUNT(*) AS count FROM rsvps')).count, 1);
+    } finally { await app.close(); }
+});
+
+test('bereits gelesene alte Identität darf nach Namenswiedervergabe keine fremde Antwort löschen', async () => {
+    const app = await instance();
+    let release;
+    try {
+        const password = 'Kuenstliches-Loeschpasswort123!';
+        const alice = await app.request('/api/register', 'POST', { username: 'DeleteAlice', password });
+        const answer = { kommt: 'Ja', huette: 'Nein', luftmatratze: 'Nein', bettzeug: 'Nein' };
+        await app.request('/api/rsvp', 'POST', answer, alice.cookie);
+        const get = app.db.get.bind(app.db);
+        let signal;
+        let paused = false;
+        const read = new Promise(resolve => { signal = resolve; });
+        const gate = new Promise(resolve => { release = resolve; });
+        app.db.get = async (sql, params) => {
+            const row = await get(sql, params);
+            if (!paused && sql.startsWith('SELECT users.id, users.username')) {
+                paused = true;
+                signal();
+                await gate;
+            }
+            return row;
+        };
+        const deletion = app.request('/api/rsvp', 'DELETE', null, alice.cookie);
+        await read;
+        assert.equal((await app.request('/api/profile/username', 'PUT', { username: 'DeleteBob', current_password: password }, alice.cookie)).status, 200);
+        const other = await app.request('/api/register', 'POST', { username: 'DeleteAlice', password: 'Anderes-Loeschpasswort123!' });
+        await app.request('/api/rsvp', 'POST', answer, other.cookie);
+        release();
+        assert.equal((await deletion).status, 200);
+        app.db.get = get;
+        const remaining = (await app.request('/api/attendees', 'GET', null, other.cookie)).data;
+        assert.equal(remaining.length, 1);
+        assert.equal(remaining[0].username, 'DeleteAlice');
+        assert.equal(remaining[0].is_self, 1);
+    } finally { if (release) release(); await app.close(); }
+});
+
+test('RSVP-Migration erhält Altantworten und ordnet verwaiste oder mehrdeutige Namen nicht neu zu', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'grillabend-rsvp-migration-'));
+    const dataDir = path.join(root, 'data');
+    fs.mkdirSync(dataDir);
+    let app;
+    try {
+        await createLegacy(path.join(dataDir, 'app.sqlite'), `
+            CREATE TABLE users (id INTEGER PRIMARY KEY, username TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL, is_admin INTEGER NOT NULL DEFAULT 0);
+            INSERT INTO users VALUES (1, 'Mara', 'synthetischer-Althash', 0), (2, 'Ben', 'synthetischer-Althash', 0);
+            CREATE TABLE rsvps (username TEXT PRIMARY KEY, kommt TEXT NOT NULL, huette TEXT NOT NULL, bettgarnitur TEXT NOT NULL, updated_at TEXT NOT NULL);
+            INSERT INTO rsvps VALUES ('Mara', 'Ja', 'Ja', 'Nein', '2026-01-01'), ('Ben', 'Ja', 'Nein', 'Nein', '2026-01-02'),
+                ('bEN', 'Nein', 'Nein', 'Nein', '2026-01-03'), ('Verwaist', 'Ja', 'Ja', 'Ja', '2026-01-04');`);
+        app = await instance(root, { dataDir });
+        assert.deepEqual(await app.db.all('SELECT user_id, updated_at FROM rsvps'), [{ user_id: 1, updated_at: '2026-01-01' }]);
+        assert.equal((await app.db.get('SELECT COUNT(*) AS count FROM rsvps_legacy_names')).count, 4);
+        await assert.rejects(app.db.run("INSERT INTO rsvps VALUES (999, 'Ja', 'Nein', 'Nein', 'Nein', '2026-01-05')"), { code: 'SQLITE_CONSTRAINT' });
+        const newcomer = await app.request('/api/register', 'POST', { username: 'Verwaist', password: 'Kuenstliches-Migrationspasswort123!' });
+        const list = (await app.request('/api/attendees', 'GET', null, newcomer.cookie)).data;
+        assert.equal(list.length, 1);
+        assert.equal(list[0].is_self, 0);
+        await app.close(); app = null;
+        app = await instance(root, { dataDir });
+        assert.equal((await app.db.get('SELECT COUNT(*) AS count FROM rsvps')).count, 1);
+        assert.equal((await app.db.get('SELECT COUNT(*) AS count FROM rsvps_legacy_names')).count, 4);
+    } finally {
+        if (app) await app.close();
+        fs.rmSync(root, { recursive: true, force: true });
+    }
+});
+
+test('erfolgreicher Login aktualisiert alte scrypt-Kosten, falsche Logins ändern Hash und Sitzungen nicht', async () => {
+    const app = await instance();
+    try {
+        const password = 'Kuenstliches-Rehashpasswort123!';
+        const created = await app.request('/api/register', 'POST', { username: 'RehashGuest', password });
+        const salt = Buffer.alloc(16, 0x42);
+        const legacy = `scrypt:${salt.toString('hex')}:${scryptSync(password, salt, 64, { N: 16384, r: 8, p: 1 }).toString('hex')}`;
+        await app.db.run('UPDATE users SET password_hash = ? WHERE username = ?', [legacy, 'RehashGuest']);
+        assert.equal((await app.request('/api/login', 'POST', { username: 'RehashGuest', password: 'wrong' })).status, 401);
+        assert.equal((await app.db.get('SELECT password_hash FROM users')).password_hash, legacy);
+        assert.equal((await app.db.get('SELECT COUNT(*) AS count FROM sessions')).count, 1);
+        const login = await app.request('/api/login', 'POST', { username: 'RehashGuest', password });
+        assert.equal(login.status, 200);
+        assert.match((await app.db.get('SELECT password_hash FROM users')).password_hash, /^scrypt:v1:16384:8:5:/);
+        assert.equal((await app.request('/api/session', 'GET', null, created.cookie)).data.username, 'RehashGuest');
+        assert.equal((await app.request('/api/session', 'GET', null, login.cookie)).data.username, 'RehashGuest');
+    } finally { await app.close(); }
+});
+
+test('Adminstart aktualisiert alte scrypt-Kosten ohne Sitzungswiderruf bei unverändertem Passwort', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'grillabend-admin-rehash-'));
+    const previousName = process.env.ADMIN_USERNAME;
+    const previousPassword = process.env.ADMIN_PASSWORD;
+    const password = 'Kuenstliches-Adminrehashpasswort123!';
+    let app;
+    try {
+        process.env.ADMIN_USERNAME = 'RehashAdmin'; process.env.ADMIN_PASSWORD = password;
+        app = await instance(root, { dataDir: root });
+        const login = await app.request('/api/login', 'POST', { username: 'RehashAdmin', password });
+        const salt = Buffer.alloc(16, 0x42);
+        const legacy = `scrypt:${salt.toString('hex')}:${scryptSync(password, salt, 64, { N: 16384, r: 8, p: 1 }).toString('hex')}`;
+        await app.db.run('UPDATE users SET password_hash = ?', [legacy]);
+        await app.close(); app = null;
+        app = await instance(root, { dataDir: root });
+        assert.match((await app.db.get('SELECT password_hash FROM users')).password_hash, /^scrypt:v1:16384:8:5:/);
+        assert.equal((await app.request('/api/session', 'GET', null, login.cookie)).data.is_admin, true);
+    } finally {
+        if (app) await app.close();
+        if (previousName === undefined) delete process.env.ADMIN_USERNAME; else process.env.ADMIN_USERNAME = previousName;
+        if (previousPassword === undefined) delete process.env.ADMIN_PASSWORD; else process.env.ADMIN_PASSWORD = previousPassword;
+        fs.rmSync(root, { recursive: true, force: true });
+    }
+});
+
+test('gleichzeitiges Legacy-Rehash und Passwortwechsel können keine alte Sitzung neu ausstellen', async () => {
+    const app = await instance();
+    try {
+        const password = 'Kuenstliches-Rehashracepasswort123!';
+        const created = await app.request('/api/register', 'POST', { username: 'RehashRace', password });
+        const salt = Buffer.alloc(16, 0x42);
+        const legacy = `scrypt:${salt.toString('hex')}:${scryptSync(password, salt, 64, { N: 16384, r: 8, p: 1 }).toString('hex')}`;
+        await app.db.run('UPDATE users SET password_hash = ?', [legacy]);
+        const nextPassword = 'Anderes-Rehashracepasswort123!';
+        const [changed, oldLogin] = await Promise.all([
+            app.request('/api/profile/password', 'PUT', { current_password: password, new_password: nextPassword }, created.cookie),
+            app.request('/api/login', 'POST', { username: 'RehashRace', password })
+        ]);
+        assert.equal(changed.status, 200);
+        assert.ok([200, 401].includes(oldLogin.status));
+        if (oldLogin.cookie) assert.equal((await app.request('/api/session', 'GET', null, oldLogin.cookie)).data.username, null);
+        assert.equal((await app.request('/api/login', 'POST', { username: 'RehashRace', password })).status, 401);
+        assert.equal((await app.request('/api/login', 'POST', { username: 'RehashRace', password: nextPassword })).status, 200);
+    } finally { await app.close(); }
 });

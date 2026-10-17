@@ -2,7 +2,8 @@ const express = require('express');
 const path = require('node:path');
 const { randomBytes } = require('node:crypto');
 const { openDatabase, MAX_USER_SESSIONS } = require('./db');
-const { hashPassword, verifyPassword, tokenHash } = require('./security');
+const { hashPassword, verifyPassword, needsPasswordRehash, tokenHash } = require('./security');
+const { createAuthLimit } = require('./auth-limit');
 
 const SESSION_AGE = 7 * 24 * 60 * 60 * 1000;
 const PROJECT_DIR = path.resolve(__dirname, '..');
@@ -66,12 +67,13 @@ async function createApp(options = {}) {
                 await db.close();
                 throw new Error('Der konfigurierte Admin-Name gehört bereits zu einem normalen Konto.');
             }
-            if (!(await verifyPassword(adminPassword, existing.password_hash))) {
+            const samePassword = await verifyPassword(adminPassword, existing.password_hash);
+            if (!samePassword || needsPasswordRehash(existing.password_hash)) {
                 const newHash = await hashPassword(adminPassword);
                 await db.exec('BEGIN IMMEDIATE');
                 try {
                     await db.run('UPDATE users SET password_hash = ? WHERE id = ?', [newHash, existing.id]);
-                    await db.run('DELETE FROM sessions WHERE user_id = ?', [existing.id]);
+                    if (!samePassword) await db.run('DELETE FROM sessions WHERE user_id = ?', [existing.id]);
                     await db.exec('COMMIT');
                 } catch (error) {
                     await db.exec('ROLLBACK');
@@ -162,11 +164,15 @@ async function createApp(options = {}) {
         return current;
     }
 
-    async function issueSession(res, user) {
+    async function issueSession(res, user, upgradedHash = null) {
         const issued = await exclusive(async () => {
             const current = await db.get('SELECT username, password_hash, is_admin, show_name FROM users WHERE id = ?', [user.id]);
             // A login verified before a concurrent password change must not create a new session afterwards.
             if (!current || (user.password_hash && current.password_hash !== user.password_hash)) return null;
+            if (upgradedHash) {
+                await db.run('UPDATE users SET password_hash = ? WHERE id = ? AND password_hash = ?',
+                    [upgradedHash, user.id, user.password_hash]);
+            }
             const token = randomBytes(32).toString('hex');
             await db.run('DELETE FROM sessions WHERE expires_at <= ?', [Date.now()]);
             await db.run('INSERT INTO sessions (token_hash, user_id, expires_at) VALUES (?, ?, ?)', [tokenHash(token), user.id, Date.now() + SESSION_AGE]);
@@ -181,18 +187,7 @@ async function createApp(options = {}) {
             show_name: issued.user.show_name === 1, account_managed: managedAdmin(issued.user) });
     }
 
-    // Simple per-IP window for auth writes; persistent throttling can be added once deployment is known.
-    const attempts = new Map();
-    function authLimit(req, res, next) {
-        const key = req.ip;
-        const now = Date.now();
-        const entry = attempts.get(key);
-        const count = entry && now - entry.since < 10 * 60 * 1000 ? entry.count + 1 : 1;
-        attempts.set(key, { since: count === 1 ? now : entry.since, count });
-        if (attempts.size > 10000) attempts.clear();
-        if (count > 30) return res.status(429).json({ error: 'Bitte später erneut versuchen.' });
-        next();
-    }
+    const authLimit = createAuthLimit();
 
     app.post('/api/register', authLimit, async (req, res, next) => {
         try {
@@ -224,7 +219,8 @@ async function createApp(options = {}) {
             if (!user || !(await verifyPassword(password, user.password_hash))) {
                 return res.status(401).json({ error: 'Name oder Passwort falsch.' });
             }
-            await issueSession(res, user);
+            const upgradedHash = needsPasswordRehash(user.password_hash) ? await hashPassword(password) : null;
+            await issueSession(res, user, upgradedHash);
         } catch (error) { next(error); }
     });
 
@@ -290,7 +286,6 @@ async function createApp(options = {}) {
                         await db.exec('ROLLBACK');
                         return { status: 409, error: 'Dieser Name ist bereits vergeben.' };
                     }
-                    await db.run('UPDATE rsvps SET username = ? WHERE username = ? COLLATE NOCASE', [name, checked.account.username]);
                     await db.exec('COMMIT');
                     return { username: name };
                 } catch (error) {
@@ -342,10 +337,10 @@ async function createApp(options = {}) {
 
     app.get('/api/attendees', requireUser, async (req, res, next) => {
         try {
-            res.json(await db.all(`SELECT CASE WHEN users.show_name = 1 THEN rsvps.username ELSE 'Anonym' END AS username,
-                rsvps.kommt, rsvps.huette, rsvps.bettgarnitur,
+            res.json(await db.all(`SELECT CASE WHEN users.show_name = 1 THEN users.username ELSE 'Anonym' END AS username,
+                rsvps.kommt, rsvps.huette, rsvps.luftmatratze, rsvps.bettzeug,
                 CASE WHEN users.id = ? THEN 1 ELSE 0 END AS is_self FROM rsvps
-                LEFT JOIN users ON users.username = rsvps.username COLLATE NOCASE
+                JOIN users ON users.id = rsvps.user_id
                 ORDER BY rsvps.updated_at DESC`, [req.user.id]));
         }
         catch (error) { next(error); }
@@ -355,8 +350,9 @@ async function createApp(options = {}) {
         const party = await db.get('SELECT * FROM party_info WHERE id = 1');
         const used = await db.get(`SELECT
             SUM(CASE WHEN huette = 'Ja' AND kommt = 'Ja' THEN 1 ELSE 0 END) AS cabin,
-            SUM(CASE WHEN huette = 'Ja' AND kommt = 'Ja' AND bettgarnitur = 'Ja' THEN 1 ELSE 0 END) AS bedding FROM rsvps`);
-        return { ...party, occupancy: { cabin: used.cabin || 0, bedding: used.bedding || 0 } };
+            SUM(CASE WHEN huette = 'Ja' AND kommt = 'Ja' AND luftmatratze = 'Ja' THEN 1 ELSE 0 END) AS luftmatratze,
+            SUM(CASE WHEN huette = 'Ja' AND kommt = 'Ja' AND bettzeug = 'Ja' THEN 1 ELSE 0 END) AS bettzeug FROM rsvps`);
+        return { ...party, occupancy: { cabin: used.cabin || 0, luftmatratze: used.luftmatratze || 0, bettzeug: used.bettzeug || 0 } };
     }
 
     app.get('/api/admin/party-info', requireUser, requireAdmin, async (req, res, next) => {
@@ -367,8 +363,8 @@ async function createApp(options = {}) {
     app.get('/api/admin/users', requireUser, requireAdmin, async (req, res, next) => {
         try {
             res.json(await db.all(`SELECT users.username, rsvps.kommt, rsvps.huette,
-                rsvps.bettgarnitur, rsvps.updated_at FROM users
-                LEFT JOIN rsvps ON rsvps.username = users.username COLLATE NOCASE
+                rsvps.luftmatratze, rsvps.bettzeug, rsvps.updated_at FROM users
+                LEFT JOIN rsvps ON rsvps.user_id = users.id
                 ORDER BY users.username COLLATE NOCASE, users.id`));
         } catch (error) { next(error); }
     });
@@ -382,7 +378,16 @@ async function createApp(options = {}) {
             const result = await exclusive(async () => {
                 const admin = await db.get('SELECT password_hash FROM users WHERE id = ? AND is_admin = 1', [req.user.id]);
                 if (!admin || !(await verifyPassword(password, admin.password_hash))) return null;
-                return db.run('DELETE FROM rsvps');
+                await db.exec('BEGIN IMMEDIATE');
+                try {
+                    const deleted = await db.run('DELETE FROM rsvps');
+                    await db.run('DELETE FROM rsvps_legacy_names');
+                    await db.exec('COMMIT');
+                    return deleted;
+                } catch (error) {
+                    await db.exec('ROLLBACK');
+                    throw error;
+                }
             });
             if (!result) return res.status(422).json({ error: 'Admin-Passwort falsch. Bitte erneut eingeben.' });
             res.json({ success: true, deleted: result.changes });
@@ -394,7 +399,8 @@ async function createApp(options = {}) {
             const fields = ['date', 'location_name', 'location_address', 'maps_url', 'rules', 'info'];
             const values = fields.map(key => req.body?.[key]);
             const cabin = req.body?.max_cabin_capacity;
-            const bedding = req.body?.max_bettgarnitur;
+            const luftmatratze = req.body?.max_luftmatratze;
+            const bettzeug = req.body?.max_bettzeug;
             const latitude = req.body?.latitude;
             const longitude = req.body?.longitude;
             const pinProvided = latitude !== undefined || longitude !== undefined;
@@ -403,12 +409,14 @@ async function createApp(options = {}) {
                  typeof longitude === 'number' && Number.isFinite(longitude) && longitude >= -180 && longitude <= 180);
             if (values.some((value, index) => !validText(value, index >= 4 ? 4000 : 300)) || !mapsUrl(values[3]) ||
                 !validPin || !Number.isInteger(cabin) || cabin < 1 || cabin > 1000 ||
-                !Number.isInteger(bedding) || bedding < 0 || bedding > 1000) {
+                !Number.isInteger(luftmatratze) || luftmatratze < 0 || luftmatratze > 1000 ||
+                !Number.isInteger(bettzeug) || bettzeug < 0 || bettzeug > 1000) {
                 return res.status(400).json({ error: 'Ungültige Veranstaltungsdaten, Koordinaten oder Maps-URL.' });
             }
             const outcome = await exclusive(async () => {
                 const current = await adminPartyInfo();
-                if (cabin < current.occupancy.cabin || bedding < current.occupancy.bedding) return null;
+                if (cabin < current.occupancy.cabin || luftmatratze < current.occupancy.luftmatratze ||
+                    bettzeug < current.occupancy.bettzeug) return null;
                 const pin = pinProvided ? {
                     latitude: latitude === null ? null : Number(latitude.toFixed(6)),
                     longitude: longitude === null ? null : Number(longitude.toFixed(6))
@@ -416,9 +424,9 @@ async function createApp(options = {}) {
                 const link = pin.latitude === null ? values[3].trim() :
                     `https://www.google.com/maps?q=${pin.latitude},${pin.longitude}`;
                 await db.run(`UPDATE party_info SET date = ?, location_name = ?, location_address = ?, maps_url = ?,
-                    rules = ?, info = ?, max_cabin_capacity = ?, max_bettgarnitur = ?, latitude = ?, longitude = ? WHERE id = 1`,
+                    rules = ?, info = ?, max_cabin_capacity = ?, max_luftmatratze = ?, max_bettzeug = ?, latitude = ?, longitude = ? WHERE id = 1`,
                 [values[0].trim(), values[1].trim(), values[2].trim(), link,
-                    values[4].trim(), values[5].trim(), cabin, bedding, pin.latitude, pin.longitude]);
+                    values[4].trim(), values[5].trim(), cabin, luftmatratze, bettzeug, pin.latitude, pin.longitude]);
                 return adminPartyInfo();
             });
             if (!outcome) return res.status(409).json({ error: 'Kapazität kleiner als bereits belegte Plätze.' });
@@ -428,26 +436,30 @@ async function createApp(options = {}) {
 
     app.post('/api/rsvp', requireUser, async (req, res, next) => {
         try {
-            const { kommt, huette, bettgarnitur } = req.body || {};
+            const { kommt, huette, luftmatratze, bettzeug } = req.body || {};
             if (!['Ja', 'Nein', 'Vielleicht'].includes(kommt) || !['Ja', 'Nein'].includes(huette) ||
-                !['Ja', 'Nein'].includes(bettgarnitur) || (kommt !== 'Ja' && huette !== 'Nein') ||
-                (huette !== 'Ja' && bettgarnitur !== 'Nein')) {
+                !['Ja', 'Nein'].includes(luftmatratze) || !['Ja', 'Nein'].includes(bettzeug) ||
+                (kommt !== 'Ja' && huette !== 'Nein') ||
+                (huette !== 'Ja' && (luftmatratze !== 'Nein' || bettzeug !== 'Nein'))) {
                 return res.status(400).json({ error: 'Ungültige Auswahl.' });
             }
             const outcome = await exclusive(async () => {
-                const limits = await db.get('SELECT max_cabin_capacity, max_bettgarnitur FROM party_info WHERE id = 1');
+                const limits = await db.get('SELECT max_cabin_capacity, max_luftmatratze, max_bettzeug FROM party_info WHERE id = 1');
                 if (huette === 'Ja') {
                     const occupied = await db.get(`SELECT
                         SUM(CASE WHEN huette = 'Ja' AND kommt = 'Ja' THEN 1 ELSE 0 END) AS cabin,
-                        SUM(CASE WHEN huette = 'Ja' AND kommt = 'Ja' AND bettgarnitur = 'Ja' THEN 1 ELSE 0 END) AS bedding
-                        FROM rsvps WHERE username != ?`, [req.user.username]);
+                        SUM(CASE WHEN huette = 'Ja' AND kommt = 'Ja' AND luftmatratze = 'Ja' THEN 1 ELSE 0 END) AS luftmatratze,
+                        SUM(CASE WHEN huette = 'Ja' AND kommt = 'Ja' AND bettzeug = 'Ja' THEN 1 ELSE 0 END) AS bettzeug
+                        FROM rsvps WHERE user_id != ?`, [req.user.id]);
                     if (occupied.cabin >= limits.max_cabin_capacity) return 'Hütte ist voll.';
-                    if (bettgarnitur === 'Ja' && occupied.bedding >= limits.max_bettgarnitur) return 'Keine Bettgarnitur mehr verfügbar.';
+                    if (luftmatratze === 'Ja' && occupied.luftmatratze >= limits.max_luftmatratze) return 'Keine Luftmatratze mehr verfügbar.';
+                    if (bettzeug === 'Ja' && occupied.bettzeug >= limits.max_bettzeug) return 'Kein Bettzeug mehr verfügbar.';
                 }
-                await db.run(`INSERT INTO rsvps (username, kommt, huette, bettgarnitur, updated_at)
-                    VALUES (?, ?, ?, ?, ?) ON CONFLICT(username) DO UPDATE SET
-                    kommt = excluded.kommt, huette = excluded.huette, bettgarnitur = excluded.bettgarnitur, updated_at = excluded.updated_at`,
-                [req.user.username, kommt, huette, bettgarnitur, new Date().toISOString()]);
+                await db.run(`INSERT INTO rsvps (user_id, kommt, huette, luftmatratze, bettzeug, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(user_id) DO UPDATE SET
+                    kommt = excluded.kommt, huette = excluded.huette, luftmatratze = excluded.luftmatratze,
+                    bettzeug = excluded.bettzeug, updated_at = excluded.updated_at`,
+                [req.user.id, kommt, huette, luftmatratze, bettzeug, new Date().toISOString()]);
                 return null;
             });
             if (outcome) return res.status(409).json({ error: outcome });
@@ -457,7 +469,7 @@ async function createApp(options = {}) {
 
     app.delete('/api/rsvp', requireUser, async (req, res, next) => {
         try {
-            await exclusive(() => db.run('DELETE FROM rsvps WHERE username = ?', [req.user.username]));
+            await exclusive(() => db.run('DELETE FROM rsvps WHERE user_id = ?', [req.user.id]));
             res.json({ success: true });
         } catch (error) { next(error); }
     });
@@ -472,7 +484,7 @@ async function createApp(options = {}) {
     }
     for (const [route, file] of [
         ['exceljs/exceljs.min.js', 'exceljs/dist/exceljs.min.js'],
-        ['pdf-lib/pdf-lib.min.js', 'pdf-lib/dist/pdf-lib.min.js'],
+        ['pdfmake/pdfmake.min.js', 'pdfmake/build/pdfmake.min.js'],
         ['jszip/jszip.min.js', 'jszip/dist/jszip.min.js']
     ]) app.get(`/vendor/${route}`, (req, res) => res.sendFile(path.join(PROJECT_DIR, 'node_modules', file)));
     app.use((error, req, res, next) => {

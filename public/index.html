@@ -108,11 +108,18 @@
                     <input type="radio" id="huette_nein" name="huette" value="Nein"><label class="radio-card" for="huette_nein">🏠 Nein</label>
                 </div>
             </fieldset>
-            <fieldset class="form-group choice-group hidden" id="bettgarniturGroup">
-                <legend>Bettgarnitur benötigt?</legend>
+            <fieldset class="form-group choice-group hidden" id="luftmatratzeGroup">
+                <legend>Luftmatratze benötigt?</legend>
                 <div class="radio-group">
-                    <input type="radio" id="bett_ja" name="bettgarnitur" value="Ja"><label class="radio-card" for="bett_ja">🛌 Ja <small id="bettVollHint" class="hidden">Schon voll!</small></label>
-                    <input type="radio" id="bett_nein" name="bettgarnitur" value="Nein" checked><label class="radio-card" for="bett_nein">🎒 Nein</label>
+                    <input type="radio" id="luftmatratze_ja" name="luftmatratze" value="Ja"><label class="radio-card" for="luftmatratze_ja">🛌 Ja <small id="luftmatratzeVollHint" class="hidden">Schon voll!</small></label>
+                    <input type="radio" id="luftmatratze_nein" name="luftmatratze" value="Nein" checked><label class="radio-card" for="luftmatratze_nein">🎒 Nein</label>
+                </div>
+            </fieldset>
+            <fieldset class="form-group choice-group hidden" id="bettzeugGroup">
+                <legend>Bettzeug benötigt?</legend>
+                <div class="radio-group">
+                    <input type="radio" id="bettzeug_ja" name="bettzeug" value="Ja"><label class="radio-card" for="bettzeug_ja">🧺 Ja <small id="bettzeugVollHint" class="hidden">Schon voll!</small></label>
+                    <input type="radio" id="bettzeug_nein" name="bettzeug" value="Nein" checked><label class="radio-card" for="bettzeug_nein">🎒 Nein</label>
                 </div>
             </fieldset>
             <p id="vielleichtHint" class="hidden hint-box">Bei „Vielleicht“ wird kein Schlafplatz reserviert.</p>
@@ -129,7 +136,8 @@
                 <div class="stat-box"><span id="count_ja">0</span> Zusagen</div>
                 <div class="stat-box"><span id="count_vielleicht">0</span> Vielleicht</div>
                 <div class="stat-box"><span id="count_huette">0/15</span> Hüttenschlaf</div>
-                <div class="stat-box"><span id="count_bettgarnitur">0/10</span> Bettgarnitur</div>
+                <div class="stat-box"><span id="count_luftmatratze">0/10</span> Luftmatratze</div>
+                <div class="stat-box"><span id="count_bettzeug">0/10</span> Bettzeug</div>
             </div>
             <ul id="attendeeList" class="attendee-list"></ul>
         </section>

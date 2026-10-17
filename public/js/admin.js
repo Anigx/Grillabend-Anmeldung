@@ -2,7 +2,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const el = id => document.getElementById(id);
     const fields = {
         date: 'adminDate', location_name: 'adminLocationName', location_address: 'adminLocationAddress',
-        maps_url: 'adminMapsUrl', max_cabin_capacity: 'adminMaxCabin', max_bettgarnitur: 'adminMaxBett',
+        maps_url: 'adminMapsUrl', max_cabin_capacity: 'adminMaxCabin', max_luftmatratze: 'adminMaxLuft',
+        max_bettzeug: 'adminMaxBettzeug',
         info: 'adminInfo', rules: 'adminRules'
     };
     const map = L.map('pinMap', { scrollWheelZoom: false }).setView([51.1657, 10.4515], 6);
@@ -30,7 +31,8 @@ document.addEventListener('DOMContentLoaded', () => {
         username: 'Registrierter Benutzername. Auch Konten ohne Teilnahmeantwort werden angezeigt.',
         kommt: 'Die aktuelle Teilnahmeantwort: Ja, Nein oder Vielleicht. „Keine Antwort“ bedeutet, dass noch kein Eintrag gespeichert wurde.',
         huette: 'Ob ein Schlafplatz in der Hütte gewünscht ist (Ja/Nein). Ohne Teilnahmeantwort steht hier „–“.',
-        bettgarnitur: 'Ob eine Bettgarnitur gewünscht ist (Ja/Nein). Ohne Teilnahmeantwort steht hier „–“.',
+        luftmatratze: 'Ob eine Luftmatratze gewünscht ist (Ja/Nein). Ohne Teilnahmeantwort steht hier „–“.',
+        bettzeug: 'Ob Bettzeug gewünscht ist (Ja/Nein). Ohne Teilnahmeantwort steht hier „–“.',
         updated_at: 'Wann die Teilnahmeantwort zuletzt gespeichert oder geändert wurde. Ohne Antwort steht „–“. Das ist nicht das Registrierungsdatum.'
     };
     const helpTooltip = el('columnHelpTooltip');
@@ -146,7 +148,8 @@ document.addEventListener('DOMContentLoaded', () => {
             users = [];
             request('GET').then(party => {
                 el('usedCabin').textContent = `${party.occupancy.cabin}/${party.max_cabin_capacity}`;
-                el('usedBedding').textContent = `${party.occupancy.bedding}/${party.max_bettgarnitur}`;
+                el('usedLuft').textContent = `${party.occupancy.luftmatratze}/${party.max_luftmatratze}`;
+                el('usedBettzeug').textContent = `${party.occupancy.bettzeug}/${party.max_bettzeug}`;
             }).catch(error => message(error.message));
         } catch (error) {
             el('resetPassword').value = '';
@@ -220,12 +223,13 @@ document.addEventListener('DOMContentLoaded', () => {
             user.username.toLocaleLowerCase('de-DE').includes(name) &&
             matchesChoice(user.kommt, el('userAttendanceFilter').value) &&
             matchesChoice(user.huette, el('userCabinFilter').value) &&
-            matchesChoice(user.bettgarnitur, el('userBeddingFilter').value));
+            matchesChoice(user.luftmatratze, el('userLuftFilter').value) &&
+            matchesChoice(user.bettzeug, el('userBettzeugFilter').value));
         const body = el('usersTableBody');
         body.replaceChildren();
         for (const user of filteredUsers) {
             const row = document.createElement('tr');
-            const values = [user.username, user.kommt || 'Keine Antwort', user.huette || '–', user.bettgarnitur || '–'];
+            const values = [user.username, user.kommt || 'Keine Antwort', user.huette || '–', user.luftmatratze || '–', user.bettzeug || '–'];
             for (const value of values) {
                 const cell = document.createElement('td');
                 cell.textContent = value;
@@ -317,7 +321,8 @@ document.addEventListener('DOMContentLoaded', () => {
         setPin(data.latitude, data.longitude);
         window.requestAnimationFrame(() => map.invalidateSize());
         el('usedCabin').textContent = `${data.occupancy.cabin}/${data.max_cabin_capacity}`;
-        el('usedBedding').textContent = `${data.occupancy.bedding}/${data.max_bettgarnitur}`;
+        el('usedLuft').textContent = `${data.occupancy.luftmatratze}/${data.max_luftmatratze}`;
+        el('usedBettzeug').textContent = `${data.occupancy.bettzeug}/${data.max_bettzeug}`;
         el('previewDate').textContent = data.date || 'Noch nicht festgelegt';
         el('previewLocation').textContent = data.location_name || 'Noch nicht festgelegt';
         el('previewAddress').textContent = data.location_address;

@@ -1,7 +1,7 @@
 // All formats use the same filtered rows and the same visible column order.
 const AdminExports = (() => {
-    const headings = ['User', 'Teilnahme', 'Hüttenschlaf', 'Bettgarnitur', 'Antwort vom'];
-    const widths = [260, 205, 220, 220, 199];
+    const headings = ['User', 'Teilnahme', 'Hüttenschlaf', 'Luftmatratze', 'Bettzeug', 'Antwort vom'];
+    const widths = [240, 170, 180, 180, 160, 174];
     const pageHeight = 1697;
     const rowHeight = 52;
     const tableTop = 184;
@@ -10,7 +10,7 @@ const AdminExports = (() => {
     function toRows(users) {
         return users.map(user => {
             const date = user.updated_at ? new Date(user.updated_at) : null;
-            return [user.username, user.kommt || 'Keine Antwort', user.huette || '–', user.bettgarnitur || '–',
+            return [user.username, user.kommt || 'Keine Antwort', user.huette || '–', user.luftmatratze || '–', user.bettzeug || '–',
                 date && !Number.isNaN(date.getTime()) ?
                     new Intl.DateTimeFormat('de-DE', { dateStyle: 'short', timeStyle: 'short' }).format(date) :
                     user.updated_at || '–'];
@@ -54,9 +54,9 @@ const AdminExports = (() => {
         const ExcelJS = await loadLibrary('/vendor/exceljs/exceljs.min.js', 'ExcelJS');
         const workbook = new ExcelJS.Workbook();
         const sheet = workbook.addWorksheet('User');
-        sheet.columns = headings.map((header, index) => ({ header, key: String(index), width: [30, 20, 22, 22, 24][index] }));
+        sheet.columns = headings.map((header, index) => ({ header, key: String(index), width: [24, 18, 20, 20, 18, 22][index] }));
         sheet.addRows(rows);
-        sheet.autoFilter = 'A1:E1';
+        sheet.autoFilter = 'A1:F1';
         sheet.views = [{ state: 'frozen', ySplit: 1 }];
         sheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
         sheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF8A2BE2' } };
@@ -135,16 +135,16 @@ const AdminExports = (() => {
     }
 
     async function pdf(rows, name) {
-        const PDFLib = await loadLibrary('/vendor/pdf-lib/pdf-lib.min.js', 'PDFLib');
-        const document = await PDFLib.PDFDocument.create();
+        const pdfMake = await loadLibrary('/vendor/pdfmake/pdfmake.min.js', 'pdfMake');
         const pages = Math.ceil(rows.length / rowsPerPage);
+        const content = [];
         for (let page = 0; page < pages; page++) {
             const canvas = drawPage(rows.slice(page * rowsPerPage, (page + 1) * rowsPerPage), page + 1, pages, pageHeight, rows.length);
-            const picture = await document.embedPng(canvas.toDataURL('image/png'));
-            const sheet = document.addPage([595.28, 841.89]);
-            sheet.drawImage(picture, { x: 0, y: 0, width: 595.28, height: 841.89 });
+            content.push({ image: canvas.toDataURL('image/png'), width: 595.28, height: 841.89,
+                absolutePosition: { x: 0, y: 0 }, ...(page ? { pageBreak: 'before' } : {}) });
         }
-        saveBlob(new Blob([await document.save()], { type: 'application/pdf' }), `${name}.pdf`);
+        const buffer = await pdfMake.createPdf({ pageSize: { width: 595.28, height: 841.89 }, pageMargins: 0, content }).getBuffer();
+        saveBlob(new Blob([buffer], { type: 'application/pdf' }), `${name}.pdf`);
     }
 
     async function download(format, users) {
