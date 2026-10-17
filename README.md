@@ -23,13 +23,14 @@ Internes Projektwissen (Architektur, Entscheidungen, Datenmodell, Changelog) ste
 - **Lokal starten:** `npm ci --ignore-scripts` und `npm start`, danach <http://127.0.0.1:621>.
 - **Erstes Admin-Konto:** Solange kein Admin existiert, leitet die Startseite auf `/setup` um; dort wird der Admin angelegt. Keine Admin-Umgebungsvariablen nötig.
 - **Passwort vergessen:** im Container `npm run reset-admin-password` (gibt ein neues Passwort aus).
+- **Showcase-Daten:** im Container `npm run seed-demo-users` erzeugt Demo-Konten mit echten Namen und Antworten (optional Anzahl, `--force`, `--cleanup`).
 - **Tests:** `npm test` (ausschließlich temporäre, künstliche Datenbanken).
 - **Ein Abend gleichzeitig** mit offener Registrierung und serverseitigen Sessions.
 
 ## Projektstruktur
 
 - `server.js` – kleiner Startpunkt; `src/server.js` – HTTP-Routen, Sitzungen und Kapazitätslogik.
-- `src/db.js`, `src/security.js`, `src/auth-limit.js` – SQLite-Initialisierung/Alt-Import, Passwort-/Token-Funktionen und Auth-Limits; `src/reset-password.js` – CLI zum Zurücksetzen des Admin-Passworts.
+- `src/db.js`, `src/security.js`, `src/auth-limit.js` – SQLite-Initialisierung/Alt-Import, Passwort-/Token-Funktionen und Auth-Limits; `src/reset-password.js` – CLI zum Zurücksetzen des Admin-Passworts; `src/seed-demo-users.js` – CLI für Showcase-Daten.
 - `public/` – `index.html`/`js/app.js` (Anmeldung und Teilnahme), `setup.html`/`js/setup.js` (Ersteinrichtung), `admin.html`/`js/admin.js` (Adminoberfläche), `css/`.
 - `test/` – automatisierte Tests.
 - `docs/handbuch/` – Anwender-/Betriebsdoku; `docs/wiki/` – internes Projektwissen.

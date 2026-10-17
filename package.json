@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node server.js",
     "test": "node --test",
-    "reset-admin-password": "node src/reset-password.js"
+    "reset-admin-password": "node src/reset-password.js",
+    "seed-demo-users": "node src/seed-demo-users.js"
   },
   "keywords": [],
   "author": "",

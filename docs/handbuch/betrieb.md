@@ -34,6 +34,22 @@ docker exec -it <container> npm run reset-admin-password
 - Das neue Passwort nur an berechtigte Personen weitergeben.
 
 
+## Showcase-Daten erzeugen
+
+Für Vorführungen erzeugt ein Kommando im Container Demo-Konten mit echten deutschen Vor- und Nachnamen sowie realistischen Teilnahmeantworten:
+
+```sh
+docker exec -it <container> npm run seed-demo-users -- 30
+```
+
+- Ohne Anzahl wird die aktuelle Hütten-Kapazität aus den Veranstaltungseinstellungen verwendet; erlaubt sind 1–1000 Konten.
+- Hütte, Luftmatratze und Bettzeug werden nur im Rahmen der konfigurierten Kapazitäten und der bereits vorhandenen Belegung vergeben.
+- Alle erzeugten Konten teilen ein zufälliges Passwort, das am Ende der Konsolenausgabe steht; damit lässt sich jedes Demo-Konto zum Testen anmelden.
+- Standardmäßig bricht der Lauf bei bereits vorhandenen Konten ab; `--force` hängt die Demo-Konten trotzdem an.
+- `npm run seed-demo-users -- --cleanup` entfernt die zuvor erzeugten Demo-Konten samt Antworten wieder; echte Konten und Admins bleiben unberührt.
+- Die Namen sind frei erfunden und gehören zu keinen realen Personen.
+
+
 ## Produktiv nur über HTTPS
 
 Im Produktionsmodus lauscht Node **nur** auf `127.0.0.1:PORT`. Ein lokaler Nginx-Reverse-Proxy übernimmt Zertifikat und TLS und leitet intern weiter. Die App akzeptiert dann nur Anfragen, bei denen der als `loopback` vertrauenswürdige Proxy `X-Forwarded-Proto: https` setzt; direkte HTTP-Anfragen ohne diesen Nachweis erhalten `426`.
