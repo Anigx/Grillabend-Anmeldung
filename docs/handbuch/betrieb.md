@@ -2,18 +2,18 @@
 
 ## Konfiguration
 
-Alle Werte stehen fest in `compose.yaml` und im Image; es gibt keine `.env`:
+Alle Werte sind fest verdrahtet; es gibt keine `.env` und keine konfigurierbaren Umgebungsvariablen:
 
 | Wert | Festlegung |
 | --- | --- |
-| Host-Mapping | `127.0.0.1:1621` → Container `80` |
-| `NODE_ENV` | `production` |
-| `PORT` | `80` |
-| `HOST` | `0.0.0.0` |
-| `DATA_DIR` | `/app/data` |
-| Image | `ghcr.io/anigx/grillabend-anmeldung:latest` |
+| Host-Mapping | `127.0.0.1:1621` → Container `80` (in `compose.yaml`) |
+| Image | `ghcr.io/anigx/grillabend-anmeldung:latest` (in `compose.yaml`) |
+| `NODE_ENV` | `production` (im Image) |
+| `PORT` | `80` (im Image) |
+| `DATA_DIR` | `/app/data` (im Image) |
+| `HOST` | `0.0.0.0` (Server-Default) |
 
-Änderungen direkt in `compose.yaml` vornehmen. Ein Admin-Konto wird nicht über Umgebungsvariablen angelegt, sondern beim ersten Aufruf über die Ersteinrichtung (`/setup`, siehe [Installation](installation.md)).
+Änderungen am Mapping oder Image direkt in `compose.yaml` vornehmen. Ein Admin-Konto wird nicht über Umgebungsvariablen angelegt, sondern beim ersten Aufruf über die Ersteinrichtung (`/setup`, siehe [Installation](installation.md)).
 
 Sitzungen laufen nach sieben Tagen ab; abgelaufene Einträge werden beim Start und beim Ausstellen neuer Sitzungen entfernt, pro Konto bleiben höchstens zehn aktive Sitzungen.
 

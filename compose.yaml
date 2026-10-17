@@ -5,11 +5,6 @@ services:
     restart: unless-stopped
     ports:
       - "127.0.0.1:1621:80"
-    environment:
-      NODE_ENV: production
-      PORT: "80"
-      DATA_DIR: /app/data
-      HOST: 0.0.0.0
     volumes:
       - grillabend-data:/app/data
 

@@ -16,7 +16,7 @@ docker compose up -d
 docker compose logs -f grillabend
 ```
 
-- Compose verwendet das veröffentlichte Image `ghcr.io/anigx/grillabend-anmeldung:latest`, den Container `grillabend` und das Volume `grillabend-data`. Node lauscht im Container nur auf **HTTP-Port 80**; veröffentlicht wird `127.0.0.1:1621 → 80`. Alle Werte stehen fest in `compose.yaml`; es gibt keine `.env`.
+- Compose verwendet das veröffentlichte Image `ghcr.io/anigx/grillabend-anmeldung:latest`, den Container `grillabend` und das Volume `grillabend-data`. Node lauscht im Container nur auf **HTTP-Port 80**; veröffentlicht wird `127.0.0.1:1621 → 80`. Image, Portmapping und Volume stehen fest in `compose.yaml`; `NODE_ENV`, `PORT` und `DATA_DIR` kommen aus dem Image. Es gibt keine `.env`.
 - **Selbstsigniertes HTTPS (Test):** `sudo bash deploy/setup-https-selfsigned.sh <host-oder-ip>` installiert Nginx, erzeugt ein selbstsigniertes Zertifikat, richtet die HTTP→HTTPS-Umleitung ein und proxyt 443 auf `127.0.0.1:1621`. Einzelheiten zu Nginx-Vorlage und Volume-Backup stehen unter [Betrieb](betrieb.md).
 - Die App hat keinen Origin-/CSRF-Check und setzt keine `Secure`-Cookies. Sie darf deshalb nicht direkt öffentlich erreichbar sein; TLS und Zugriffsschutz gehören in den vorgelagerten Proxy.
 
