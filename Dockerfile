@@ -12,9 +12,9 @@ COPY public/ ./public/
 RUN mkdir -p /app/data && chown node:node /app/data
 
 ENV NODE_ENV=production \
-    PORT=621 \
+    PORT=80 \
     DATA_DIR=/app/data
 
 USER node
-EXPOSE 621
+EXPOSE 80
 CMD ["node", "server.js"]

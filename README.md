@@ -19,10 +19,11 @@ Internes Projektwissen (Architektur, Entscheidungen, Datenmodell, Changelog) ste
 
 ## Auf einen Blick
 
-- **Empfohlen: Docker.** `.env` aus `.env.example` erstellen, dort `APP_ORIGIN` als HTTPS-Origin aktivieren, dann `docker compose pull` und `docker compose up -d` (Details: [Betrieb](docs/handbuch/betrieb.md)).
-- **Selbstsigniertes HTTPS (Test):** `sudo bash deploy/setup-https-selfsigned.sh <host-oder-ip>` installiert Nginx, erzeugt ein selbstsigniertes Zertifikat, leitet HTTP auf HTTPS um und setzt `APP_ORIGIN`/`HOST` in `.env`. Später durch einen Proxy mit echtem Zertifikat ersetzbar.
+- **Empfohlen: Docker + Reverse Proxy.** Optional `.env` aus `.env.example` erstellen (Standard: `127.0.0.1:1621` → Container `80`), dann `docker compose pull` und `docker compose up -d`. TLS übernimmt ein lokaler Proxy auf 443 (Details: [Betrieb](docs/handbuch/betrieb.md)).
+- **Selbstsigniertes HTTPS (Test):** `sudo bash deploy/setup-https-selfsigned.sh <host-oder-ip>` installiert Nginx, erzeugt ein selbstsigniertes Zertifikat und proxyt 443 auf `127.0.0.1:1621`. Später durch ein echtes Zertifikat ersetzbar.
 - **Lokal mit Node (Alternative):** Node.js ab 22.13, `npm ci --ignore-scripts` und `npm start`, danach <http://127.0.0.1:621> (SQLite kommt aus Node selbst, kein natives npm-Binding). Der Server bindet standardmäßig an `0.0.0.0` (per `HOST` änderbar) und ist damit auch über die Netzwerk-IP erreichbar.
-- **Windows mit Docker Desktop:** `.env.windows.example` nach `.env.windows` kopieren, dann `docker compose --env-file .env.windows -f compose.windows.yaml up -d` und <http://127.0.0.1:1621> öffnen (Portmapping statt Host-Netzwerk; Details: [Installation](docs/handbuch/installation.md)).
+- **Windows mit Docker Desktop:** gleiche `compose.yaml`; Docker Desktop nutzt Portmapping statt Host-Netzwerk. Danach <http://127.0.0.1:1621> öffnen.
+- **Sicherheit:** Die App spricht nur HTTP und hat keinen Origin-/CSRF-Check sowie keine `Secure`-Cookies. Sie darf nur über den vorgelagerten Proxy erreichbar sein (Standardbindung `127.0.0.1`).
 - **Erstes Admin-Konto:** Solange kein Admin existiert, leitet die Startseite auf `/setup` um; dort wird der Admin angelegt. Keine Admin-Umgebungsvariablen nötig.
 - **Passwort vergessen:** im Container `npm run reset-admin-password` (gibt ein neues Passwort aus).
 - **Showcase-Daten:** im Container `npm run seed-demo-users` erzeugt Demo-Konten mit echten Namen und Antworten (optional Anzahl, `--force`, `--cleanup`).

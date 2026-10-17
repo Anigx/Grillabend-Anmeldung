@@ -14,8 +14,8 @@ Diese Anwender- und Betriebsdokumentation richtet sich an die Personen, die die 
 
 ## Ganz kurz
 
-- **Empfohlen:** Betrieb per Docker/Compose (Linux-Host mit Host-Netzwerk) hinter einem lokalen Nginx-Reverse-Proxy; alternativ lokal mit Node.js ab 22.13.
-- Docker: `.env` aus `.env.example` erstellen, darin `APP_ORIGIN` setzen, dann `docker compose pull` und `docker compose up -d`.
+- **Empfohlen:** Betrieb per Docker/Compose mit Portmapping hinter einem lokalen Nginx-Reverse-Proxy; alternativ lokal mit Node.js ab 22.13.
+- Docker: optional `.env` aus `.env.example` erstellen (Bindung/Port), dann `docker compose pull` und `docker compose up -d`. Die App spricht intern nur HTTP auf Port 80; TLS macht der Proxy.
 - Lokal mit Node: `npm ci --ignore-scripts`, dann `npm start`, danach <http://127.0.0.1:621>.
 - Admin-Konten werden über die Ersteinrichtung unter `/setup` (solange noch kein Admin existiert) oder aus Alt-Daten angelegt; die erste öffentliche Registrierung ist **kein** Admin.
 - Die Teilnahmedaten liegen in `data/app.sqlite` (im Container im Volume `grillabend-data`) und müssen bei einem Umzug separat gesichert werden.

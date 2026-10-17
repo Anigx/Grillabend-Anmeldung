@@ -45,7 +45,7 @@ jobs:
         run: |
           docker run --rm -i \
             --tmpfs /app/data:rw,uid=1000,gid=1000 \
-            -e APP_ORIGIN=https://127.0.0.1:621 grillabend:smoke node - < deploy/smoke-image.cjs
+            -e PORT=80 grillabend:smoke node - < deploy/smoke-image.cjs
 
   publish:
     needs: build

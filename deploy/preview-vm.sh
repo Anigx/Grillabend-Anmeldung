@@ -38,7 +38,7 @@ case "${1:-}" in
       exit 1
     fi
 
-    printf 'APP_ORIGIN=%s\nGRILLABEND_IMAGE=grillabend:vm-test\n' "$url" > .env
+    printf 'GRILLABEND_BIND=127.0.0.1\nGRILLABEND_HTTP_PORT=1621\nGRILLABEND_IMAGE=grillabend:vm-test\n' > .env
     chmod 600 .env
     docker compose config --quiet
     docker compose up -d --no-build --pull never
@@ -75,7 +75,7 @@ case "${1:-}" in
       sudo tail -n 30 /var/log/nginx/error.log || true
       exit 1
     fi
-    [[ "$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:1621/api/session)" == 426 ]]
+    [[ "$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:1621/api/session)" == 200 ]]
     [[ "$(curl --silent --output /dev/null --write-out '%{http_code}' --header "Host: $host" http://127.0.0.1:8080/api/session)" == 403 ]]
 
     for attempt in $(seq 1 30); do

@@ -25,6 +25,7 @@
 
 ## Technische Mindestanforderung
 
-- **Empfohlen wird der Betrieb per Docker/Compose** auf einem Linux-Host mit Host-Netzwerk und lokalem Nginx-Reverse-Proxy. Der Container heißt `grillabend`.
-- **Selbstsigniertes HTTPS (Test):** `deploy/setup-https-selfsigned.sh` richtet Nginx mit Testzertifikat, HTTP→HTTPS-Umleitung und passender `APP_ORIGIN` ein.
+- **Empfohlen wird der Betrieb per Docker/Compose** mit Portmapping und einem lokalen Nginx-Reverse-Proxy für TLS. Der Container heißt `grillabend` und spricht intern nur HTTP auf Port 80.
+- **App nie direkt öffentlich freigeben:** Standardbindung ist `127.0.0.1`; es gibt keinen Origin-/CSRF-Check und keine `Secure`-Cookies. Nur der Proxy darf 80/443 anbieten.
+- **Selbstsigniertes HTTPS (Test):** `deploy/setup-https-selfsigned.sh` richtet Nginx mit Testzertifikat, HTTP→HTTPS-Umleitung und Proxy auf `127.0.0.1:<GRILLABEND_HTTP_PORT>` ein.
 - **Für den lokalen Betrieb ohne Docker:** Node.js ab 22.13 – ältere Versionen laden die Anwendung nicht.

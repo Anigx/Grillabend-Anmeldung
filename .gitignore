@@ -4,4 +4,3 @@ data/
 .env
 .env.*
 !.env.example
-!.env.windows.example

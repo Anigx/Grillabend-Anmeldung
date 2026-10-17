@@ -3,14 +3,13 @@ services:
     image: ${GRILLABEND_IMAGE:-ghcr.io/anigx/grillabend-anmeldung:latest}
     container_name: grillabend
     restart: unless-stopped
-    network_mode: host
-    env_file:
-      - .env
+    ports:
+      - "${GRILLABEND_BIND:-127.0.0.1}:${GRILLABEND_HTTP_PORT:-1621}:80"
     environment:
       NODE_ENV: production
-      PORT: "1621"
+      PORT: "80"
       DATA_DIR: /app/data
-      APP_ORIGIN: ${APP_ORIGIN:?APP_ORIGIN in .env als HTTPS-Origin eintragen}
+      HOST: 0.0.0.0
     volumes:
       - grillabend-data:/app/data
 

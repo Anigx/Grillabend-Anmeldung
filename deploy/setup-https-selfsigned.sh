@@ -16,6 +16,10 @@ fi
 PRIMARY="$1"
 shift || true
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+APP_PORT="${APP_PORT:-}"
+if [[ -z "$APP_PORT" && -f "$PROJECT_DIR/.env" ]]; then
+    APP_PORT="$(sed -n 's/^GRILLABEND_HTTP_PORT=//p' "$PROJECT_DIR/.env" | tail -n 1 | tr -d '\r' | xargs)"
+fi
 APP_PORT="${APP_PORT:-1621}"
 CERT_DIR="/etc/nginx/ssl/grillabend"
 CERT="$CERT_DIR/selfsigned.crt"
@@ -23,7 +27,6 @@ KEY="$CERT_DIR/selfsigned.key"
 
 SANS=""
 SERVER_NAMES="$PRIMARY"
-ORIGINS="https://$PRIMARY"
 add_san() {
     if [[ "$1" =~ ^[0-9.]+$ ]]; then
         SANS="${SANS},IP:$1"
@@ -36,7 +39,6 @@ add_san "$PRIMARY"
 for name in "$@"; do
     add_san "$name"
     SERVER_NAMES="$SERVER_NAMES $name"
-    ORIGINS="$ORIGINS,https://$name"
 done
 add_san 127.0.0.1
 add_san localhost
@@ -99,27 +101,12 @@ nginx -t
 systemctl enable --now nginx
 systemctl reload nginx
 
-ENV_FILE="$PROJECT_DIR/.env"
-if [[ -f "$ENV_FILE" ]]; then
-    if grep -q '^APP_ORIGIN=' "$ENV_FILE"; then
-        sed -i "s|^APP_ORIGIN=.*|APP_ORIGIN=$ORIGINS|" "$ENV_FILE"
-    else
-        printf '\nAPP_ORIGIN=%s\n' "$ORIGINS" >> "$ENV_FILE"
-    fi
-    if grep -q '^HOST=' "$ENV_FILE"; then
-        sed -i 's|^HOST=.*|HOST=127.0.0.1|' "$ENV_FILE"
-    else
-        printf 'HOST=127.0.0.1\n' >> "$ENV_FILE"
-    fi
-    (cd "$PROJECT_DIR" && docker compose up -d)
-else
-    echo "Hinweis: $ENV_FILE fehlt. APP_ORIGIN=$ORIGINS und HOST=127.0.0.1 setzen und Compose starten."
-fi
+(cd "$PROJECT_DIR" && docker compose up -d)
 
 echo
 echo "Selbstsigniertes HTTPS aktiv:"
 echo "  HTTP  http://$PRIMARY/  ->  https://$PRIMARY/"
-echo "  HTTPS https://$PRIMARY/"
+echo "  HTTPS https://$PRIMARY/  ->  http://127.0.0.1:$APP_PORT"
 echo "Der Browser zeigt eine Zertifikatswarnung (selbstsigniert)."
 echo "Für ein echtes Zertifikat später einen Reverse Proxy davor setzen oder"
 echo "deploy/nginx.conf.example mit Zertifikatspfaden verwenden."

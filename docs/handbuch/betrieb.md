@@ -4,19 +4,19 @@
 
 | Variable | Standard | Bedeutung |
 | --- | --- | --- |
-| `PORT` | `621` | HTTP-Port des Servers. |
-| `HOST` | `0.0.0.0` | Netzwerkbindung des Servers. `127.0.0.1` beschränkt den Zugriff auf den lokalen Rechner bzw. einen lokalen Proxy. |
-| `DATA_DIR` | `data/` (im Projektordner) | Ordner der SQLite-Datenbank. |
-| `APP_ORIGIN` | – | Zulässige öffentliche Origins für Schreibanfragen (Schema, Host, optional Port) – **ohne** abschließenden Slash oder Pfad; mehrere kommasepariert. Mit `https://` erzwingt der Produktionsmodus HTTPS und `Secure`-Cookies; mit `http://` ist direkter HTTP-Betrieb erlaubt (nur in einem vertrauenswürdigen, verschlüsselten Netz wie VPN oder hinter einem TLS-Proxy). Ohne die Variable wird die Origin aus Anfrageprotokoll und Host abgeleitet. |
-| `NODE_ENV` | – | `production` setzt bei HTTPS-Origin das Session-Cookie auf `Secure` und verlangt bestätigtes HTTPS. |
+| `GRILLABEND_BIND` | `127.0.0.1` | Host-Adresse für das Portmapping. `0.0.0.0` nur hinter einem vertrauenswürdigen Proxy/VPN verwenden. |
+| `GRILLABEND_HTTP_PORT` | `1621` | Externer HTTP-Port, auf den der Reverse Proxy zeigt; im Container lauscht Node auf `80`. |
+| `GRILLABEND_IMAGE` | GHCR-Image | Optional ein anderes, bereits vorhandenes Image verwenden. |
+| `PORT` / `HOST` / `DATA_DIR` | `80` / `0.0.0.0` / `/app/data` | Werden im Image bzw. in Compose gesetzt; nur für Sonderfälle ändern. |
+| `NODE_ENV` | `production` | Im Image/Compose gesetzt; steuert keine HTTPS-Logik mehr. |
 
 Ein Admin-Konto wird nicht mehr über Umgebungsvariablen angelegt, sondern beim ersten Aufruf über die Ersteinrichtung (`/setup`, siehe [Installation](installation.md)).
 
-Beispiel (PowerShell, lokale Entwicklung):
+Beispiel (`.env` für Compose):
 
-```powershell
-$env:APP_ORIGIN = 'http://127.0.0.1:621'
-npm.cmd start
+```sh
+GRILLABEND_BIND=127.0.0.1
+GRILLABEND_HTTP_PORT=1621
 ```
 
 Sitzungen laufen nach sieben Tagen ab; abgelaufene Einträge werden beim Start und beim Ausstellen neuer Sitzungen entfernt, pro Konto bleiben höchstens zehn aktive Sitzungen.
@@ -51,14 +51,14 @@ docker exec -it <container> npm run seed-demo-users -- 30
 - Die Namen sind frei erfunden und gehören zu keinen realen Personen.
 
 
-## Produktiv: HTTPS über Proxy oder HTTP im vertrauenswürdigen Netz
+## HTTP intern, TLS am Reverse Proxy
 
-Node bindet standardmäßig an `0.0.0.0:PORT` (per `HOST` änderbar) und ist damit über alle Netzwerkschnittstellen erreichbar – auch über ein VPN wie NetBird. Für eine feste öffentliche Domain `APP_ORIGIN` vor dem Start setzen; der Wert wird nicht durch Nginx gesetzt.
+Die App spricht ausschließlich HTTP. Im Container lauscht Node auf `0.0.0.0:80`; Docker veröffentlicht standardmäßig `127.0.0.1:1621`. Ein lokaler Reverse Proxy terminiert TLS auf 443 und leitet an `127.0.0.1:<GRILLABEND_HTTP_PORT>` weiter.
 
-- **`APP_ORIGIN=https://…` (empfohlen):** Ein lokaler Nginx-Reverse-Proxy übernimmt Zertifikat und TLS. Die App akzeptiert nur Anfragen, bei denen der als `loopback` vertrauenswürdige Proxy `X-Forwarded-Proto: https` setzt; direkte HTTP-Anfragen ohne diesen Nachweis erhalten `426`. Das Session-Cookie ist `Secure`.
-- **`APP_ORIGIN=http://…`:** Direkter HTTP-Betrieb ohne TLS und ohne `Secure`-Cookie. Nur geeignet, wenn die Verbindung anderweitig verschlüsselt ist (z. B. VPN wie NetBird) oder ein vorgelagerter Proxy TLS terminiert. `HOST=127.0.0.1` zusammen mit einem lokalen Proxy entspricht der früheren, strengeren Konfiguration.
-
-`deploy/nginx.conf.example` zeigt die nötige Konfiguration (Weiterleitung von Port 80 auf 443, Zertifikat, Upstream `127.0.0.1:1621`, Setzen von `Host` und Überschreiben von `X-Forwarded-Proto`, Anti-Framing-Header). Vor dem Einsatz Domain und **beide Dateipfade** ersetzen; keine Zertifikate oder privaten Schlüssel ins Repository übernehmen.
+- Es gibt **keine** HTTPS-Erzwingung (`426`), **keine** `Secure`-Cookies und **keinen** Origin-/CSRF-Check mehr. `SameSite=Lax` bleibt als einzige CSRF-Bremse.
+- Der Proxy setzt `X-Forwarded-For`; die App vertraut Loopback- und privaten Docker-Adressen, damit die Login-Limits pro echter Client-IP gelten.
+- `deploy/nginx.conf.example` zeigt die Konfiguration (Weiterleitung 80 → 443, Zertifikat, Upstream `127.0.0.1:1621`, Anti-Framing-Header). Domain und **beide Dateipfade** ersetzen; keine Zertifikate oder privaten Schlüssel ins Repository übernehmen.
+- Die App nie direkt öffentlich erreichbar machen: Standardbindung `127.0.0.1` beibehalten und nur den Proxy auf 80/443 veröffentlichen.
 
 ### Selbstsigniertes HTTPS (Test)
 
@@ -68,21 +68,20 @@ Für Tests ohne echtes Zertifikat richtet ein Skript Nginx mit einem selbstsigni
 sudo bash deploy/setup-https-selfsigned.sh <host-oder-ip> [weitere-san...]
 ```
 
-- Installiert bei Bedarf Nginx und OpenSSL, erzeugt das Zertifikat unter `/etc/nginx/ssl/grillabend/` und konfiguriert Port 443 als Reverse-Proxy auf `127.0.0.1:1621`.
-- Leitet `http://…` (Port 80) und `https://…:8443` auf `https://…` (Port 443) um.
-- Setzt `APP_ORIGIN` auf alle übergebenen Hosts/IPs (kommasepariert) sowie `HOST=127.0.0.1` in `.env` und startet Compose neu.
-- Der Browser zeigt eine Zertifikatswarnung; das ist bei einem selbstsignierten Zertifikat erwartet.
-- Für ein echtes Zertifikat später einen Reverse Proxy davor setzen (oder Nginx mit den Zertifikatspfaden aus `deploy/nginx.conf.example` bestücken) und `APP_ORIGIN` auf die öffentliche Domain umstellen.
+- Installiert bei Bedarf Nginx und OpenSSL, erzeugt das Zertifikat unter `/etc/nginx/ssl/grillabend/` und proxyt Port 443 auf `127.0.0.1:<GRILLABEND_HTTP_PORT>` (Standard 1621).
+- Liest `GRILLABEND_HTTP_PORT` aus `.env`; ohne Eintrag gilt 1621.
+- Leitet `http://…` (Port 80) und `https://…:8443` auf `https://…` (Port 443) um und startet Compose neu.
+- Der Browser zeigt eine Zertifikatswarnung; für ein echtes Zertifikat später die Nginx-Konfiguration aus `deploy/nginx.conf.example` verwenden.
 
 ## Docker und Compose
 
 - Das `Dockerfile` erstellt ein Node-22-Produktionsimage (Debian Trixie slim, per Digest fixiert) mit `npm ci --omit=dev --ignore-scripts`. SQLite stammt aus Node selbst.
-- `compose.yaml` startet das Image im Container `grillabend` mit dem persistenten Volume `grillabend-data` und verlangt eine konfigurierte `APP_ORIGIN`. Die versionierte `.env.example` enthält alle Angaben kommentiert; `.env` ist die lokale, ignorierte Kopie.
-- Die dokumentierte Startweise setzt einen **Linux-Host mit Host-Netzwerk** voraus: Node ist auf `0.0.0.0:1621` erreichbar; mit `HOST=127.0.0.1` bleibt es auf den lokalen Proxy beschränkt. Der Host-Port 1621 liegt oberhalb der privilegierten Ports.
-- **Windows/Docker Desktop:** `compose.windows.yaml` mit `docker compose --env-file .env.windows -f compose.windows.yaml up -d` nutzen (Portmapping auf `127.0.0.1:1621`, `HOST=0.0.0.0`, HTTP-`APP_ORIGIN`). `network_mode: host` bezieht sich dort nur auf die Linux-VM.
+- `compose.yaml` startet das Image im Container `grillabend` mit dem persistenten Volume `grillabend-data` und veröffentlicht Container-Port `80` auf `GRILLABEND_BIND:GRILLABEND_HTTP_PORT` (Standard `127.0.0.1:1621`). Die versionierte `.env.example` enthält alle Angaben kommentiert; `.env` ist die lokale, ignorierte Kopie.
+- Das `Dockerfile` setzt `PORT=80` und `EXPOSE 80`. Docker erlaubt dem unprivilegierten Benutzer `node` das Binden von 80 im Container; nach außen ist nur der gemappte Port sichtbar.
+- **Windows/Docker Desktop:** dieselbe `compose.yaml` verwenden; Portmapping funktioniert dort ohne Host-Netzwerk.
 
 ```sh
-cp .env.example .env   # APP_ORIGIN aktivieren
+cp .env.example .env   # optional: Bindung/Port anpassen
 docker compose pull
 docker compose up -d
 docker compose logs -f grillabend

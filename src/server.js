@@ -30,80 +30,24 @@ function mapsUrl(value) {
     }
 }
 
-function parseOrigin(value) {
-    if (typeof value !== 'string') return null;
-    try {
-        const url = new URL(value);
-        return ['http:', 'https:'].includes(url.protocol) && value === url.origin ? url.origin : null;
-    } catch {
-        return null;
-    }
-}
-
-function parseOrigins(value) {
-    if (typeof value !== 'string') return null;
-    const parts = value.split(',').map(part => part.trim()).filter(Boolean);
-    if (parts.length === 0) return null;
-    const origins = [];
-    for (const part of parts) {
-        const origin = parseOrigin(part);
-        if (!origin || origins.includes(origin)) return null;
-        origins.push(origin);
-    }
-    return origins;
-}
-
 async function createApp(options = {}) {
-    const originSetting = options.origin ?? process.env.APP_ORIGIN;
-    const allowedOrigins = originSetting === undefined ? null : parseOrigins(originSetting);
-    if (originSetting !== undefined && !allowedOrigins) {
-        throw new Error('APP_ORIGIN muss eine oder mehrere gültige Origins enthalten (kommasepariert; Schema, Host, optional Port; ohne Pfad oder Zugangsdaten).');
-    }
-    const requireHttps = process.env.NODE_ENV === 'production' &&
-        (allowedOrigins ? allowedOrigins.every(origin => origin.startsWith('https://')) : true);
     const db = await openDatabase({
         dataDir: options.dataDir || process.env.DATA_DIR || path.join(PROJECT_DIR, 'data'),
         legacyDir: options.legacyDir || PROJECT_DIR
     });
     const app = express();
     app.disable('x-powered-by');
-    if (requireHttps) {
-        // Only the local reverse proxy may report the original HTTPS scheme.
-        app.set('trust proxy', 'loopback');
-        app.use((req, res, next) => {
-            if (req.secure) return next();
-            res.set('Cache-Control', 'no-store');
-            res.status(426).json({ error: 'HTTPS erforderlich.' });
-        });
-    }
+    // The app speaks HTTP behind a local reverse proxy. Trust proxy headers only
+    // for client IP detection (per-IP auth limits); Origin/HTTPS checks are not used.
+    app.set('trust proxy', ['loopback', 'linklocal', 'uniquelocal']);
     app.use(express.json({ limit: '16kb' }));
     app.use('/api', (req, res, next) => {
         res.set('Cache-Control', 'no-store');
         next();
     });
-    app.use((req, res, next) => {
-        if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) return next();
-        const origin = req.get('origin');
-        const site = req.get('sec-fetch-site');
-        const host = req.get('host');
-        let requestOrigin = null;
-        if (host) {
-            try {
-                const url = new URL(`${req.protocol}://${host}`);
-                if (!url.username && !url.password && url.pathname === '/' && !url.search && !url.hash) requestOrigin = url.origin;
-            } catch { /* Ein fehlerhafter Host wird abgelehnt. */ }
-        }
-        // Same-origin browser writes carry Origin; reject missing, malformed, cross-scheme or cross-site writes.
-        if (!requestOrigin || (allowedOrigins && !allowedOrigins.includes(requestOrigin)) || parseOrigin(origin) !== requestOrigin ||
-            (site && !['same-origin', 'none'].includes(site))) {
-            return res.status(403).json({ error: 'Ungültiger Anfrageursprung.' });
-        }
-        next();
-    });
 
     function cookie(res, token, maxAge) {
-        const secure = requireHttps ? '; Secure' : '';
-        res.set('Set-Cookie', `sid=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${maxAge}${secure}`);
+        res.set('Set-Cookie', `sid=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${maxAge}`);
     }
 
     function sessionToken(req) {

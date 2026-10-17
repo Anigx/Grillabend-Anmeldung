@@ -2,7 +2,7 @@
 
 ## Voraussetzungen
 
-- **Docker (empfohlen):** Docker mit Compose auf einem Linux-Host mit Host-Netzwerk; die öffentliche TLS-Verbindung endet an einem lokalen Nginx-Reverse-Proxy (siehe [Betrieb](betrieb.md)).
+- **Docker (empfohlen):** Docker mit Compose auf Linux oder Docker Desktop; die App läuft intern nur HTTP auf Container-Port 80, die öffentliche TLS-Verbindung endet an einem lokalen Reverse-Proxy (siehe [Betrieb](betrieb.md)).
 - **Ohne Docker (Alternative):** Node.js ab 22.13. Die Anwendung nutzt das in Node integrierte `node:sqlite`; ein separates natives SQLite-Paket wird nicht benötigt.
 - Internetzugang für die Karten- und Exporter-Funktionen ist nur im Browser nötig (OpenStreetMap/Nominatim bzw. Google Maps), nicht für den Serverstart.
 
@@ -11,15 +11,16 @@
 Im Projektordner:
 
 ```sh
-cp .env.example .env   # APP_ORIGIN auf die tatsächliche HTTPS-Origin setzen
+cp .env.example .env   # optional: GRILLABEND_BIND/GRILLABEND_HTTP_PORT anpassen
 docker compose pull
 docker compose up -d
 docker compose logs -f grillabend
 ```
 
-- Compose verwendet das veröffentlichte Image `ghcr.io/anigx/grillabend-anmeldung:latest`, das feste Volume `grillabend-data` und `NODE_ENV=production`. Im Produktionsmodus lauscht Node standardmäßig auf `0.0.0.0:1621` (per `HOST` änderbar). Mit einer HTTPS-Origin übernimmt ein lokaler Nginx-Reverse-Proxy die öffentliche TLS-Verbindung; mit einer HTTP-Origin ist direkter Zugriff im vertrauenswürdigen Netz (z. B. VPN) möglich.
-- `APP_ORIGIN` enthält eine oder mehrere erlaubte Origins für Schreibanfragen (kommasepariert, ohne Pfad oder abschließenden `/`). `https://` erzwingt HTTPS und Secure-Cookies; `http://` erlaubt direkten HTTP-Betrieb ohne TLS.
-- **Selbstsigniertes HTTPS (Test):** `sudo bash deploy/setup-https-selfsigned.sh <host-oder-ip>` installiert Nginx, erzeugt ein selbstsigniertes Zertifikat, richtet die HTTP→HTTPS-Umleitung ein und setzt `APP_ORIGIN`/`HOST` in `.env`. Der Compose-Container heißt `grillabend`; Einzelheiten zu Nginx-Vorlage, `GRILLABEND_IMAGE` und Volume-Backup stehen unter [Betrieb](betrieb.md).
+- Compose verwendet das veröffentlichte Image `ghcr.io/anigx/grillabend-anmeldung:latest`, den Container `grillabend` und das Volume `grillabend-data`. Node lauscht im Container nur auf **HTTP-Port 80**; veröffentlicht wird standardmäßig `127.0.0.1:1621 → 80`.
+- `GRILLABEND_BIND` (Standard `127.0.0.1`) und `GRILLABEND_HTTP_PORT` (Standard `1621`) steuern das Host-Mapping. `127.0.0.1` bedeutet: nur der lokale Proxy erreicht die App. `0.0.0.0` nur hinter einem vertrauenswürdigen Proxy/VPN verwenden.
+- **Selbstsigniertes HTTPS (Test):** `sudo bash deploy/setup-https-selfsigned.sh <host-oder-ip>` installiert Nginx, erzeugt ein selbstsigniertes Zertifikat, richtet die HTTP→HTTPS-Umleitung ein und proxyt 443 auf `127.0.0.1:<GRILLABEND_HTTP_PORT>`. Einzelheiten zu Nginx-Vorlage, `GRILLABEND_IMAGE` und Volume-Backup stehen unter [Betrieb](betrieb.md).
+- Die App hat keinen Origin-/CSRF-Check und setzt keine `Secure`-Cookies. Sie darf deshalb nicht direkt öffentlich erreichbar sein; TLS und Zugriffsschutz gehören in den vorgelagerten Proxy.
 
 ## Alternative: lokal mit Node
 
@@ -41,16 +42,16 @@ npm.cmd start
 
 ### Windows mit Docker Desktop
 
-`network_mode: host` funktioniert unter Docker Desktop nicht, weil es sich nur auf die Linux-VM bezieht. Dafür gibt es `compose.windows.yaml` mit Portmapping:
+Dieselbe `compose.yaml` funktioniert unter Docker Desktop, weil sie Portmapping statt Host-Netzwerk nutzt:
 
 ```powershell
-Copy-Item .env.windows.example .env.windows
-docker compose --env-file .env.windows -f compose.windows.yaml pull
-docker compose --env-file .env.windows -f compose.windows.yaml up -d
+Copy-Item .env.example .env
+docker compose pull
+docker compose up -d
 ```
 
-- `APP_ORIGIN` steht in `.env.windows` (Standard `http://127.0.0.1:1621`); für LAN-Zugriff dort die LAN-IP ergänzen und das Portmapping in `compose.windows.yaml` auf `"1621:1621"` ändern.
-- Im Container sind `HOST=0.0.0.0` und `PORT=1621` fest gesetzt, damit das Portmapping greift; danach <http://127.0.0.1:1621> öffnen.
+- Danach <http://127.0.0.1:1621> öffnen. Im Container lauscht Node auf `0.0.0.0:80`, Docker veröffentlicht `127.0.0.1:1621`.
+- Für andere Ports `GRILLABEND_HTTP_PORT` in `.env` ändern; für LAN-Zugriff zusätzlich `GRILLABEND_BIND=0.0.0.0`.
 - Nginx/HTTPS entfällt lokal; für Produktion den Linux-Weg mit `deploy/setup-https-selfsigned.sh` verwenden.
 
 Tests ausführen (verwenden ausschließlich temporäre, künstliche Datenbanken):
