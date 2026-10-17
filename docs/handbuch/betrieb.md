@@ -5,9 +5,10 @@
 | Variable | Standard | Bedeutung |
 | --- | --- | --- |
 | `PORT` | `621` | HTTP-Port des Servers. |
+| `HOST` | `0.0.0.0` | Netzwerkbindung des Servers. `127.0.0.1` beschränkt den Zugriff auf den lokalen Rechner bzw. einen lokalen Proxy. |
 | `DATA_DIR` | `data/` (im Projektordner) | Ordner der SQLite-Datenbank. |
-| `APP_ORIGIN` | – | Einzige zulässige öffentliche Origin für Schreibanfragen (Schema, Host, optional Port) – **ohne** abschließenden Slash oder Pfad. In Produktion zwingend HTTPS. Ohne die Variable wird die Origin aus Anfrageprotokoll und Host abgeleitet. |
-| `NODE_ENV` | – | `production` setzt das Session-Cookie auf `Secure`, bindet Node nur an `127.0.0.1` und verlangt bestätigtes HTTPS. |
+| `APP_ORIGIN` | – | Einzige zulässige öffentliche Origin für Schreibanfragen (Schema, Host, optional Port) – **ohne** abschließenden Slash oder Pfad. Mit `https://` erzwingt der Produktionsmodus HTTPS und `Secure`-Cookies; mit `http://` ist direkter HTTP-Betrieb erlaubt (nur in einem vertrauenswürdigen, verschlüsselten Netz wie VPN oder hinter einem TLS-Proxy). Ohne die Variable wird die Origin aus Anfrageprotokoll und Host abgeleitet. |
+| `NODE_ENV` | – | `production` setzt bei HTTPS-Origin das Session-Cookie auf `Secure` und verlangt bestätigtes HTTPS. |
 
 Ein Admin-Konto wird nicht mehr über Umgebungsvariablen angelegt, sondern beim ersten Aufruf über die Ersteinrichtung (`/setup`, siehe [Installation](installation.md)).
 
@@ -50,19 +51,20 @@ docker exec -it <container> npm run seed-demo-users -- 30
 - Die Namen sind frei erfunden und gehören zu keinen realen Personen.
 
 
-## Produktiv nur über HTTPS
+## Produktiv: HTTPS über Proxy oder HTTP im vertrauenswürdigen Netz
 
-Im Produktionsmodus lauscht Node **nur** auf `127.0.0.1:PORT`. Ein lokaler Nginx-Reverse-Proxy übernimmt Zertifikat und TLS und leitet intern weiter. Die App akzeptiert dann nur Anfragen, bei denen der als `loopback` vertrauenswürdige Proxy `X-Forwarded-Proto: https` setzt; direkte HTTP-Anfragen ohne diesen Nachweis erhalten `426`.
+Node bindet standardmäßig an `0.0.0.0:PORT` (per `HOST` änderbar) und ist damit über alle Netzwerkschnittstellen erreichbar – auch über ein VPN wie NetBird. Für eine feste öffentliche Domain `APP_ORIGIN` vor dem Start setzen; der Wert wird nicht durch Nginx gesetzt.
+
+- **`APP_ORIGIN=https://…` (empfohlen):** Ein lokaler Nginx-Reverse-Proxy übernimmt Zertifikat und TLS. Die App akzeptiert nur Anfragen, bei denen der als `loopback` vertrauenswürdige Proxy `X-Forwarded-Proto: https` setzt; direkte HTTP-Anfragen ohne diesen Nachweis erhalten `426`. Das Session-Cookie ist `Secure`.
+- **`APP_ORIGIN=http://…`:** Direkter HTTP-Betrieb ohne TLS und ohne `Secure`-Cookie. Nur geeignet, wenn die Verbindung anderweitig verschlüsselt ist (z. B. VPN wie NetBird) oder ein vorgelagerter Proxy TLS terminiert. `HOST=127.0.0.1` zusammen mit einem lokalen Proxy entspricht der früheren, strengeren Konfiguration.
 
 `deploy/nginx.conf.example` zeigt die nötige Konfiguration (Weiterleitung von Port 80 auf 443, Zertifikat, Upstream `127.0.0.1:1621`, Setzen von `Host` und Überschreiben von `X-Forwarded-Proto`, Anti-Framing-Header). Vor dem Einsatz Domain und **beide Dateipfade** ersetzen; keine Zertifikate oder privaten Schlüssel ins Repository übernehmen. Die Vorlage ist noch nicht produktiv aktiviert, weil Domain und Pfade noch offen sind.
-
-Für eine feste öffentliche Domain `APP_ORIGIN` vor dem Start auf die HTTPS-Origin setzen; der Wert wird nicht durch Nginx gesetzt.
 
 ## Docker und Compose
 
 - Das `Dockerfile` erstellt ein Node-22-Produktionsimage (Debian Trixie slim, per Digest fixiert) mit `npm ci --omit=dev --ignore-scripts`. SQLite stammt aus Node selbst.
 - `compose.yaml` startet das Image mit dem persistenten Volume `grillabend-data` und verlangt eine konfigurierte `APP_ORIGIN`. Die versionierte `.env.example` enthält alle Angaben kommentiert; `.env` ist die lokale, ignorierte Kopie.
-- Die dokumentierte Startweise setzt einen **Linux-Host mit Host-Netzwerk** voraus: Node bleibt auf `127.0.0.1:1621` erreichbar, und Express vertraut weiterhin nur dem lokalen Proxy. Der Host-Port 1621 liegt oberhalb der privilegierten Ports.
+- Die dokumentierte Startweise setzt einen **Linux-Host mit Host-Netzwerk** voraus: Node ist auf `0.0.0.0:1621` erreichbar; mit `HOST=127.0.0.1` bleibt es auf den lokalen Proxy beschränkt. Der Host-Port 1621 liegt oberhalb der privilegierten Ports.
 
 ```sh
 cp .env.example .env   # APP_ORIGIN aktivieren

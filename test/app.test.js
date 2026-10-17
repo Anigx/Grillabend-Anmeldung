@@ -616,13 +616,16 @@ test('APP_ORIGIN bindet Schreibanfragen an die konfigurierte HTTPS-/Host-/Port-K
     const original = process.env.NODE_ENV;
     process.env.NODE_ENV = 'production';
     let secureApp;
+    let httpApp;
     try {
-        await assert.rejects(createApp({ dataDir: app.root, legacyDir: app.root, origin: 'http://example.test' }), /APP_ORIGIN/);
+        httpApp = await instance(undefined, { origin: 'http://veranstaltung.example' });
+        assert.equal(await request(httpApp.base, 'veranstaltung.example', 'http://veranstaltung.example'), 200);
         secureApp = await instance(undefined, { origin: 'https://veranstaltung.example' });
         assert.equal(await request(secureApp.base, 'veranstaltung.example', 'https://veranstaltung.example'), 426);
         assert.equal(await request(secureApp.base, 'veranstaltung.example', 'http://veranstaltung.example', 'https'), 403);
         assert.equal(await request(secureApp.base, 'veranstaltung.example', 'https://veranstaltung.example', 'https'), 200);
     } finally {
+        if (httpApp) await httpApp.close();
         if (secureApp) await secureApp.close();
         if (original === undefined) delete process.env.NODE_ENV; else process.env.NODE_ENV = original;
     }

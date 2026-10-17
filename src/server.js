@@ -43,16 +43,18 @@ function parseOrigin(value) {
 async function createApp(options = {}) {
     const originSetting = options.origin ?? process.env.APP_ORIGIN;
     const allowedOrigin = originSetting === undefined ? null : parseOrigin(originSetting);
-    if (originSetting !== undefined && (!allowedOrigin || (process.env.NODE_ENV === 'production' && !allowedOrigin.startsWith('https://')))) {
-        throw new Error('APP_ORIGIN muss eine gültige Origin sein (Schema, Host, optional Port; in Produktion HTTPS).');
+    if (originSetting !== undefined && !allowedOrigin) {
+        throw new Error('APP_ORIGIN muss eine gültige Origin sein (Schema, Host, optional Port; ohne Pfad oder Zugangsdaten).');
     }
+    const requireHttps = process.env.NODE_ENV === 'production' &&
+        (allowedOrigin ? allowedOrigin.startsWith('https://') : true);
     const db = await openDatabase({
         dataDir: options.dataDir || process.env.DATA_DIR || path.join(PROJECT_DIR, 'data'),
         legacyDir: options.legacyDir || PROJECT_DIR
     });
     const app = express();
     app.disable('x-powered-by');
-    if (process.env.NODE_ENV === 'production') {
+    if (requireHttps) {
         // Only the local reverse proxy may report the original HTTPS scheme.
         app.set('trust proxy', 'loopback');
         app.use((req, res, next) => {
@@ -87,7 +89,7 @@ async function createApp(options = {}) {
     });
 
     function cookie(res, token, maxAge) {
-        const secure = process.env.NODE_ENV === 'production' ? '; Secure' : '';
+        const secure = requireHttps ? '; Secure' : '';
         res.set('Set-Cookie', `sid=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${maxAge}${secure}`);
     }
 

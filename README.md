@@ -20,7 +20,7 @@ Internes Projektwissen (Architektur, Entscheidungen, Datenmodell, Changelog) ste
 ## Auf einen Blick
 
 - **Empfohlen: Docker.** `.env` aus `.env.example` erstellen, dort `APP_ORIGIN` als HTTPS-Origin aktivieren, dann `docker compose pull` und `docker compose up -d` (Details: [Betrieb](docs/handbuch/betrieb.md)).
-- **Lokal mit Node (Alternative):** Node.js ab 22.13, `npm ci --ignore-scripts` und `npm start`, danach <http://127.0.0.1:621> (SQLite kommt aus Node selbst, kein natives npm-Binding).
+- **Lokal mit Node (Alternative):** Node.js ab 22.13, `npm ci --ignore-scripts` und `npm start`, danach <http://127.0.0.1:621> (SQLite kommt aus Node selbst, kein natives npm-Binding). Der Server bindet standardmäßig an `0.0.0.0` (per `HOST` änderbar) und ist damit auch über die Netzwerk-IP erreichbar.
 - **Erstes Admin-Konto:** Solange kein Admin existiert, leitet die Startseite auf `/setup` um; dort wird der Admin angelegt. Keine Admin-Umgebungsvariablen nötig.
 - **Passwort vergessen:** im Container `npm run reset-admin-password` (gibt ein neues Passwort aus).
 - **Showcase-Daten:** im Container `npm run seed-demo-users` erzeugt Demo-Konten mit echten Namen und Antworten (optional Anzahl, `--force`, `--cleanup`).

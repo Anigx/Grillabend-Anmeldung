@@ -17,8 +17,8 @@ docker compose up -d
 docker compose logs -f grillabend
 ```
 
-- Compose verwendet das veröffentlichte Image `ghcr.io/anigx/grillabend-anmeldung:latest`, das feste Volume `grillabend-data` und `NODE_ENV=production`. Im Produktionsmodus lauscht Node nur auf `127.0.0.1:1621`; die öffentliche HTTPS-Verbindung übernimmt ein lokaler Nginx-Reverse-Proxy, der wie der Container im Host-Netzwerk läuft.
-- `APP_ORIGIN` ist die einzige erlaubte Origin für Schreibanfragen (HTTPS, ohne Pfad oder abschließenden `/`) und muss dem Host entsprechen, den Nginx an Node weiterleitet.
+- Compose verwendet das veröffentlichte Image `ghcr.io/anigx/grillabend-anmeldung:latest`, das feste Volume `grillabend-data` und `NODE_ENV=production`. Im Produktionsmodus lauscht Node standardmäßig auf `0.0.0.0:1621` (per `HOST` änderbar). Mit einer HTTPS-Origin übernimmt ein lokaler Nginx-Reverse-Proxy die öffentliche TLS-Verbindung; mit einer HTTP-Origin ist direkter Zugriff im vertrauenswürdigen Netz (z. B. VPN) möglich.
+- `APP_ORIGIN` ist die einzige erlaubte Origin für Schreibanfragen (ohne Pfad oder abschließenden `/`). `https://` erzwingt HTTPS und Secure-Cookies; `http://` erlaubt direkten HTTP-Betrieb ohne TLS.
 - Einzelheiten, die Nginx-Vorlage, `GRILLABEND_IMAGE` und das Backup des Volumes stehen unter [Betrieb](betrieb.md).
 
 ## Alternative: lokal mit Node
@@ -30,7 +30,7 @@ npm ci --ignore-scripts
 npm start
 ```
 
-Danach <http://127.0.0.1:621> öffnen. Ohne Produktionsmodus bindet der Server an `0.0.0.0` (Port `621`) und ist bei entsprechender Firewall-Freigabe auch über die IPv4-Adresse des Rechners im Netzwerk erreichbar; Registrierung und HTTP funktionieren dann ebenfalls über diesen Host.
+Danach <http://127.0.0.1:621> öffnen. Der Server bindet standardmäßig an `0.0.0.0` (Port `621`, per `HOST` änderbar) und ist bei entsprechender Firewall-Freigabe auch über die IPv4-Adresse des Rechners im Netzwerk erreichbar; Registrierung und HTTP funktionieren dann ebenfalls über diesen Host.
 
 Unter PowerShell mit gesperrten Skripten die `.cmd`-Variante verwenden:
 
