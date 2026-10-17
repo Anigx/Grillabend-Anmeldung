@@ -6,7 +6,42 @@
 - **Ohne Docker (Alternative):** Node.js ab 22.13. Die Anwendung nutzt das in Node integrierte `node:sqlite`; ein separates natives SQLite-Paket wird nicht benötigt.
 - Internetzugang für die Karten- und Exporter-Funktionen ist nur im Browser nötig (OpenStreetMap/Nominatim bzw. Google Maps), nicht für den Serverstart.
 
-## Installation mit Docker (empfohlen)
+## Automatische Installation (empfohlen)
+
+Die Skripte `install.sh` (Debian/Ubuntu, x86_64) und `install.ps1` (Windows, Docker Desktop) führen durch eine interaktive Fullscreen-TUI. Sie prüfen bzw. installieren die Voraussetzungen, klonen das Projekt, richten das Image und das Volume ein und unterstützen Update, Import einer vorhandenen `data/app.sqlite`, Backup, Deinstallation und Autostart.
+
+### Linux (Debian/Ubuntu)
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/Anigx/Grillabend-Anmeldung/main/install.sh -o /tmp/grillabend-install.sh
+bash /tmp/grillabend-install.sh
+```
+
+- Das Skript benötigt root-Rechte und ein interaktives Terminal (bei SSH z. B. `ssh -t`). Es startet sich bei Bedarf per `sudo` neu. `git` und `curl` werden nur nach Rückfrage aus dem Debian/Ubuntu-Repository installiert. Fehlt Docker, wird das offizielle Docker-Repository eingerichtet (`docker-ce`, Compose-Plugin); eine vorhandene geeignete Docker-Installation wird weiterverwendet.
+- Standardziel ist `/opt/grillabend`, der Pfad wird abgefragt. Status: `/var/lib/grillabend-installer/state`, Logs: `/var/log/grillabend-installer/`.
+- **Bindung:** Standard ist **nur lokal** (`127.0.0.1:1621`) für einen Reverse Proxy auf demselben Server. Optional ist die LAN-Freigabe (`0.0.0.0:1621`) mit ausdrücklicher Bestätigung; bei aktivem `ufw` kann eine Regel angelegt werden. Die App spricht nur HTTP.
+- Das Image wird als `ghcr.io/anigx/grillabend-anmeldung:latest` gezogen. Es gibt nur `linux/amd64`; ARM-Systeme (z. B. Raspberry Pi) werden abgelehnt.
+- Ein Update sichert die SQLite-Datenbank vorher automatisch (die letzten fünf Backups bleiben unter `backups/`). `--uninstall` entfernt Container und Image, behält Projektordner, Volume und Backups. `--purge` entfernt zusätzlich Volume, Projektordner und Backups.
+- Ein lokaler Reverse Proxy kann anschließend auf `127.0.0.1:1621` zeigen. Das Skript installiert bewusst **kein** Nginx und kein Zertifikat; dafür gelten die Hinweise unter [Betrieb](betrieb.md).
+
+### Windows (Docker Desktop, ohne WSL-Distribution)
+
+```powershell
+[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12
+$d="$env:PUBLIC\Grillabend-Installer"
+New-Item -ItemType Directory -Force -Path $d | Out-Null
+Invoke-RestMethod https://raw.githubusercontent.com/Anigx/Grillabend-Anmeldung/main/install.ps1 -OutFile "$d\install.ps1"
+powershell -NoProfile -ExecutionPolicy Bypass -File "$d\install.ps1"
+```
+
+- Unterstützt Windows 11 sowie Windows 10 22H2 mit Warnung; nur x64. Die TUI benötigt eine normale PowerShell-Konsole (nicht ISE) und startet sich per UAC in einem neuen Fenster. Docker Desktop wird bei Bedarf per `winget` installiert. WSL2 wird **nur als von Docker Desktop benötigtes Backend** aktiviert; es wird keine Ubuntu-Distribution eingerichtet. Git wird bei Bedarf per `winget` installiert.
+- Standardziel ist `%USERPROFILE%\Grillabend-Anmeldung`, der Pfad wird abgefragt. Status und Logs: `%ProgramData%\Grillabend-Installer`.
+- **Bindung:** Standard ist die LAN-Freigabe (`0.0.0.0:1621`) nach ausdrücklicher Bestätigung. Der Installer legt eine Windows-Firewall-Regel für TCP 1621 in privaten/Domänen-Netzen und dem lokalen Subnetz an. „Nur lokal“ (`127.0.0.1:1621`) ist ebenfalls wählbar. Die App spricht nur HTTP; im LAN sind Zugangsdaten unverschlüsselt.
+- Docker Desktop wird beim Anmelden über eine Aufgabe gestartet, damit der Container mit `restart: unless-stopped` wieder hochkommt. Die Aufgabe und die Firewall-Regel werden nur von der App angelegt und bei der Deinstallation entfernt; Docker Desktop, WSL2 und Git bleiben installiert.
+- Ein Neustart nach der WSL2-Aktivierung wird erkannt. Nach dem Neustart den Installer erneut starten; er bietet das Fortsetzen an. Updates sichern die Datenbank automatisch. `-Uninstall` behält Daten, `-Purge` löscht zusätzlich Volume, Projekt und Backups.
+- Docker Desktop ist für Privatanwender, Bildung und kleine Unternehmen kostenlos; für größere Unternehmen gelten die Lizenzbedingungen von Docker. Der Installer zeigt vor der Installation einen entsprechenden Hinweis.
+
+## Installation mit Docker (manuell)
 
 Im Projektordner:
 
@@ -16,7 +51,7 @@ docker compose up -d
 docker compose logs -f grillabend
 ```
 
-- Compose verwendet das veröffentlichte Image `ghcr.io/anigx/grillabend-anmeldung:latest`, den Container `grillabend` und das Volume `grillabend-data`. Node lauscht im Container nur auf **HTTP-Port 80**; veröffentlicht wird `127.0.0.1:1621 → 80`. Image, Portmapping und Volume stehen fest in `compose.yaml`; `NODE_ENV`, `PORT` und `DATA_DIR` kommen aus dem Image. Es gibt keine `.env`.
+- Compose verwendet das veröffentlichte Image `ghcr.io/anigx/grillabend-anmeldung:latest`, den Container `grillabend` und das Volume `grillabend-data`. Node lauscht im Container nur auf **HTTP-Port 80**; veröffentlicht wird `127.0.0.1:1621 → 80`. Image, Portmapping und Volume stehen fest in `compose.yaml`; `NODE_ENV`, `PORT` und `DATA_DIR` kommen aus dem Image. Es gibt keine `.env`. Für die LAN-Freigabe legt der Installer eine lokale, nicht versionierte `compose.override.yaml` an (`0.0.0.0:1621:80`); ohne diese Datei bleibt es bei der Loopback-Bindung.
 - **Selbstsigniertes HTTPS (Test):** `sudo bash deploy/setup-https-selfsigned.sh <host-oder-ip>` installiert Nginx, erzeugt ein selbstsigniertes Zertifikat, richtet die HTTP→HTTPS-Umleitung ein und proxyt 443 auf `127.0.0.1:1621`. Einzelheiten zu Nginx-Vorlage und Volume-Backup stehen unter [Betrieb](betrieb.md).
 - Die App hat keinen Origin-/CSRF-Check und setzt keine `Secure`-Cookies. Sie darf deshalb nicht direkt öffentlich erreichbar sein; TLS und Zugriffsschutz gehören in den vorgelagerten Proxy.
 
@@ -38,7 +73,7 @@ npm.cmd ci --ignore-scripts
 npm.cmd start
 ```
 
-### Windows mit Docker Desktop
+### Windows mit Docker Desktop (manuell)
 
 Dieselbe `compose.yaml` funktioniert unter Docker Desktop, weil sie Portmapping statt Host-Netzwerk nutzt:
 
@@ -48,8 +83,8 @@ docker compose up -d
 ```
 
 - Danach <http://127.0.0.1:1621> öffnen. Im Container lauscht Node auf `0.0.0.0:80`, Docker veröffentlicht `127.0.0.1:1621`.
-- Andere Ports oder LAN-Zugriff direkt in `compose.yaml` unter `ports` ändern (z. B. `"0.0.0.0:1621:80"`).
-- Nginx/HTTPS entfällt lokal; für Produktion den Linux-Weg mit `deploy/setup-https-selfsigned.sh` verwenden.
+- Für LAN-Zugriff die Bindung in einer lokalen `compose.override.yaml` auf `0.0.0.0:1621:80` ändern (so macht es der Installer) und eine Firewall-Regel für TCP 1621 anlegen. Die App spricht nur HTTP; im LAN sind Zugangsdaten unverschlüsselt.
+- Der Installer richtet Docker Desktop und das WSL2-Backend ein, installiert aber keine Ubuntu-Distribution. Nginx/HTTPS entfällt lokal; für Produktion den Linux-Weg mit `deploy/setup-https-selfsigned.sh` verwenden oder einen externen HTTPS-Proxy davorsetzen.
 
 Tests ausführen (verwenden ausschließlich temporäre, künstliche Datenbanken):
 
@@ -61,7 +96,7 @@ npm test
 
 Ein Admin-Konto wird beim ersten Start **in der Oberfläche** angelegt, nicht über Umgebungsvariablen:
 
-1. Die Anwendung starten (per Docker oder lokal) und die Seite im Browser öffnen – bei Docker über die öffentliche HTTPS-Adresse, lokal <http://127.0.0.1:621>.
+1. Die Anwendung starten (per Installer, Docker oder lokal) und die Seite im Browser öffnen – bei Docker über die öffentliche HTTPS-Adresse, lokal <http://127.0.0.1:621>. Der automatische Installer zeigt die passende `/setup`-Adresse an und öffnet sie unter Windows auf Wunsch im Browser.
 2. Solange kein Admin existiert, leitet die Startseite automatisch auf `/setup` um. Dort Benutzername (2–40 Zeichen) und Passwort (mindestens zwölf Zeichen mit Groß- und Kleinbuchstaben, Zahl und Sonderzeichen) eingeben.
 3. Nach dem Anlegen zur Anmeldung zurückkehren und mit dem neuen Konto anmelden.
 

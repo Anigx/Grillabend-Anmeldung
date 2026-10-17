@@ -19,6 +19,7 @@ Dieses Dokument beschreibt die Schutzmaßnahmen der Anwendung, den Stand eines s
 - **Kein Mehrinstanz-Schutz:** Kapazitätsprüfungen und Auth-Limits gelten nur innerhalb eines Prozesses. Vor Mehrfachbetrieb wäre eine gemeinsame atomare Reservierung nötig.
 - **Bewusst reduzierte CSRF-Absicherung:** Ohne Origin-Check bleibt nur `SameSite=Lax`. Same-Site-Kontexte (z. B. andere Subdomains) und ältere Browser können Schreibanfragen begünstigen. Die App muss hinter dem Proxy und ohne direkte öffentliche Erreichbarkeit betrieben werden.
 - **Keine `Secure`-Cookies:** Session-Cookies werden auch über HTTPS nicht als `Secure` markiert. Das ist nur akzeptabel, weil TLS am Proxy endet und die App ausschließlich über diesen erreichbar sein soll.
+- **LAN-Freigabe durch den Installer:** `install.sh`/`install.ps1` können die App optional auf `0.0.0.0:1621` freigeben. Dabei werden Zugangsdaten und Session-Cookies unverschlüsselt übertragen. Die Freigabe ist nur in einem vertrauenswürdigen Netz vertretbar; für öffentliche Erreichbarkeit muss ein HTTPS-Proxy davorsitzen.
 - **Geheimnisse:** Zertifikate und das über die Ersteinrichtung vergebene bzw. per `reset-admin-password` erzeugte Passwort dürfen nie ins Repository. Eine `.env` wird von der App nicht verwendet.
 - **Konfigurationsquelle:** `process.env.*` wird als vertrauenswürdige Betreiber-Eingabe behandelt, nicht als Angreifer-Eingabe; die Werte werden in `compose.yaml` fest gesetzt.
 

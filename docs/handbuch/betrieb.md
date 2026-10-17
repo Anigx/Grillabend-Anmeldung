@@ -15,7 +15,24 @@ Alle Werte sind fest verdrahtet; es gibt keine `.env` und keine konfigurierbaren
 
 Änderungen am Mapping oder Image direkt in `compose.yaml` vornehmen. Ein Admin-Konto wird nicht über Umgebungsvariablen angelegt, sondern beim ersten Aufruf über die Ersteinrichtung (`/setup`, siehe [Installation](installation.md)).
 
+Der Installer ändert `compose.yaml` nicht. Für die LAN-Freigabe legt er eine lokale `compose.override.yaml` mit `ports: !override` und `0.0.0.0:1621:80` an; sie ist von Git ausgeschlossen und wird von Docker Compose automatisch geladen. Ohne diese Datei bleibt es bei `127.0.0.1:1621`. Compose muss dafür mindestens 2.24.4 unterstützen.
+
 Sitzungen laufen nach sieben Tagen ab; abgelaufene Einträge werden beim Start und beim Ausstellen neuer Sitzungen entfernt, pro Konto bleiben höchstens zehn aktive Sitzungen.
+
+## Automatischer Installer
+
+`install.sh` (Debian/Ubuntu) und `install.ps1` (Windows/Docker Desktop) sind interaktive Fullscreen-Installer. Sie prüfen bzw. installieren Docker, klonen das Projekt, ziehen das GHCR-Image, richten das Volume ein, bieten den Import einer vorhandenen `data/app.sqlite` an und unterstützen Update, Backup, Deinstallation und Autostart.
+
+| Betriebssystem | Status/Logs | Entfernen |
+| --- | --- | --- |
+| Linux | `/var/lib/grillabend-installer/state`, `/var/log/grillabend-installer/` | `bash install.sh --uninstall` bzw. `--purge` |
+| Windows | `%ProgramData%\Grillabend-Installer\state.json`, `...\Logs\` | `.\install.ps1 -Uninstall` bzw. `-Purge` |
+
+- **Linux:** Standardziel `/opt/grillabend`, Standardbindung nur lokal (`127.0.0.1:1621`). Docker wird bei Bedarf aus dem offiziellen Repository installiert. Nginx/HTTPS werden nicht eingerichtet; der spätere Proxy zeigt auf `127.0.0.1:1621`.
+- **Windows:** Standardziel `%USERPROFILE%\Grillabend-Anmeldung`, Standardbindung LAN (`0.0.0.0:1621`) nach Bestätigung; Firewall-Regel nur für private/Domänen-Netze und das lokale Subnetz. Docker Desktop wird per `winget` installiert; WSL2 dient nur als Backend, ohne Ubuntu-Distribution.
+- **Sicherheit:** Die App spricht nur HTTP und hat keinen Origin-/CSRF-Check. Die LAN-Freigabe ist nur in vertrauenswürdigen Netzen sinnvoll; für öffentliche Erreichbarkeit muss ein HTTPS-Proxy davorsitzen.
+- **Updates:** Vor dem Update wird die SQLite-Datenbank automatisch gesichert (die letzten fünf Backups bleiben in `backups/`). Bei einem Fehler versucht der Installer, die App mit dem vorhandenen Stand neu zu starten.
+- **Deinstallation:** `--uninstall`/`-Uninstall` entfernt Container und Image, behält Projektordner, Volume und Backups. `--purge`/`-Purge` entfernt zusätzlich Volume, Projektordner und Backups. Docker Desktop, WSL2 und Git werden nicht entfernt.
 
 ## Admin-Passwort zurücksetzen
 
