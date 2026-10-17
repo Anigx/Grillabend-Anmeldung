@@ -49,8 +49,8 @@ docker compose --env-file .env.windows -f compose.windows.yaml pull
 docker compose --env-file .env.windows -f compose.windows.yaml up -d
 ```
 
-- `APP_ORIGIN` steht in `.env.windows` (Standard `http://127.0.0.1:621`); für LAN-Zugriff dort die LAN-IP ergänzen und das Portmapping in `compose.windows.yaml` auf `"621:621"` ändern.
-- Im Container ist `HOST=0.0.0.0` fest gesetzt, damit das Portmapping greift.
+- `APP_ORIGIN` steht in `.env.windows` (Standard `http://127.0.0.1:1621`); für LAN-Zugriff dort die LAN-IP ergänzen und das Portmapping in `compose.windows.yaml` auf `"1621:1621"` ändern.
+- Im Container sind `HOST=0.0.0.0` und `PORT=1621` fest gesetzt, damit das Portmapping greift; danach <http://127.0.0.1:1621> öffnen.
 - Nginx/HTTPS entfällt lokal; für Produktion den Linux-Weg mit `deploy/setup-https-selfsigned.sh` verwenden.
 
 Tests ausführen (verwenden ausschließlich temporäre, künstliche Datenbanken):

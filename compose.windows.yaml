@@ -4,10 +4,10 @@ services:
     container_name: grillabend
     restart: unless-stopped
     ports:
-      - "127.0.0.1:621:621"
+      - "127.0.0.1:1621:1621"
     environment:
       NODE_ENV: production
-      PORT: "621"
+      PORT: "1621"
       DATA_DIR: /app/data
       HOST: 0.0.0.0
       APP_ORIGIN: ${APP_ORIGIN:?APP_ORIGIN in .env.windows als HTTP-Origin eintragen}

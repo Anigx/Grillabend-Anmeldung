@@ -79,7 +79,7 @@ sudo bash deploy/setup-https-selfsigned.sh <host-oder-ip> [weitere-san...]
 - Das `Dockerfile` erstellt ein Node-22-Produktionsimage (Debian Trixie slim, per Digest fixiert) mit `npm ci --omit=dev --ignore-scripts`. SQLite stammt aus Node selbst.
 - `compose.yaml` startet das Image im Container `grillabend` mit dem persistenten Volume `grillabend-data` und verlangt eine konfigurierte `APP_ORIGIN`. Die versionierte `.env.example` enthält alle Angaben kommentiert; `.env` ist die lokale, ignorierte Kopie.
 - Die dokumentierte Startweise setzt einen **Linux-Host mit Host-Netzwerk** voraus: Node ist auf `0.0.0.0:1621` erreichbar; mit `HOST=127.0.0.1` bleibt es auf den lokalen Proxy beschränkt. Der Host-Port 1621 liegt oberhalb der privilegierten Ports.
-- **Windows/Docker Desktop:** `compose.windows.yaml` mit `docker compose --env-file .env.windows -f compose.windows.yaml up -d` nutzen (Portmapping auf `127.0.0.1:621`, `HOST=0.0.0.0`, HTTP-`APP_ORIGIN`). `network_mode: host` bezieht sich dort nur auf die Linux-VM.
+- **Windows/Docker Desktop:** `compose.windows.yaml` mit `docker compose --env-file .env.windows -f compose.windows.yaml up -d` nutzen (Portmapping auf `127.0.0.1:1621`, `HOST=0.0.0.0`, HTTP-`APP_ORIGIN`). `network_mode: host` bezieht sich dort nur auf die Linux-VM.
 
 ```sh
 cp .env.example .env   # APP_ORIGIN aktivieren
