@@ -1,6 +1,6 @@
 services:
   grillabend:
-    image: ${GRILLABEND_IMAGE:-ghcr.io/anigx/cloud-erazy-project:latest}
+    image: ${GRILLABEND_IMAGE:-ghcr.io/anigx/grillabend-anmeldung:latest}
     restart: unless-stopped
     network_mode: host
     env_file:

@@ -17,7 +17,7 @@ docker compose up -d
 docker compose logs -f grillabend
 ```
 
-- Compose verwendet das veröffentlichte Image `ghcr.io/anigx/cloud-erazy-project:latest`, das feste Volume `grillabend-data` und `NODE_ENV=production`. Im Produktionsmodus lauscht Node nur auf `127.0.0.1:1621`; die öffentliche HTTPS-Verbindung übernimmt ein lokaler Nginx-Reverse-Proxy, der wie der Container im Host-Netzwerk läuft.
+- Compose verwendet das veröffentlichte Image `ghcr.io/anigx/grillabend-anmeldung:latest`, das feste Volume `grillabend-data` und `NODE_ENV=production`. Im Produktionsmodus lauscht Node nur auf `127.0.0.1:1621`; die öffentliche HTTPS-Verbindung übernimmt ein lokaler Nginx-Reverse-Proxy, der wie der Container im Host-Netzwerk läuft.
 - `APP_ORIGIN` ist die einzige erlaubte Origin für Schreibanfragen (HTTPS, ohne Pfad oder abschließenden `/`) und muss dem Host entsprechen, den Nginx an Node weiterleitet.
 - Einzelheiten, die Nginx-Vorlage, `GRILLABEND_IMAGE` und das Backup des Volumes stehen unter [Betrieb](betrieb.md).
 

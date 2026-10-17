@@ -63,11 +63,13 @@ jobs:
       - name: Release-Tag muss auf main liegen
         if: startsWith(github.ref, 'refs/tags/v')
         run: git merge-base --is-ancestor "$GITHUB_SHA" refs/remotes/origin/main
+      - name: Image-Namen in Kleinbuchstaben ermitteln
+        run: echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
       - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
       - uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
         id: meta
         with:
-          images: ghcr.io/${{ github.repository }}
+          images: ${{ env.IMAGE }}
           tags: |
             type=ref,event=branch
             type=ref,event=tag

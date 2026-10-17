@@ -26,7 +26,7 @@ Der Projektverantwortliche hat die **Oberfläche des importierten Projekts** als
 
 ## Leitlinie für spätere UI-Arbeit
 
-Neue Ansichten und Bedienelemente sollen sich optisch an diesen belegten Farben, Schriften, Karten und Zuständen orientieren. Vor UI-Änderungen die betroffenen Dateien unter `public/` erneut prüfen; das Wiki ist nicht die Quelle der CSS-Werte. Die Beschriftung „Grillabend“ ist noch kein bestätigter endgültiger Projektname (siehe [[projekt/ueberblick]]). `Unklar:` Ob zusätzlich eine Bildvorlage oder konkrete Änderungswünsche zur Darstellung folgen.
+Neue Ansichten und Bedienelemente sollen sich optisch an diesen belegten Farben, Schriften, Karten und Zuständen orientieren. Vor UI-Änderungen die betroffenen Dateien unter `public/` erneut prüfen; das Wiki ist nicht die Quelle der CSS-Werte. Der Projektname ist bestätigt: **Grillabend-Anmeldung**; die sichtbare Beschriftung in der Oberfläche bleibt „Grillabend“ (siehe [[projekt/ueberblick]]). `Unklar:` Ob zusätzlich eine Bildvorlage oder konkrete Änderungswünsche zur Darstellung folgen.
 
 ## Verwandte Seiten
 

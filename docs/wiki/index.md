@@ -1,6 +1,6 @@
 # Internes Projekt-Wiki
 
-Code und überprüfbare Projektkonfiguration haben Vorrang vor diesem Wiki. Pfade im Wiki beziehen sich auf das Projektverzeichnis `cloud-erazy-project/`. Einstieg in Ziel und aktuellen Stand: [[projekt/ueberblick]].
+Code und überprüfbare Projektkonfiguration haben Vorrang vor diesem Wiki. Pfade im Wiki beziehen sich auf das Projektverzeichnis `Grillabend-Anmeldung/`. Einstieg in Ziel und aktuellen Stand: [[projekt/ueberblick]].
 
 ## Projekt und Aufbau
 
