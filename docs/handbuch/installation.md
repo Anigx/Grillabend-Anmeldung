@@ -18,9 +18,8 @@ docker compose logs -f grillabend
 ```
 
 - Compose verwendet das veröffentlichte Image `ghcr.io/anigx/grillabend-anmeldung:latest`, das feste Volume `grillabend-data` und `NODE_ENV=production`. Im Produktionsmodus lauscht Node standardmäßig auf `0.0.0.0:1621` (per `HOST` änderbar). Mit einer HTTPS-Origin übernimmt ein lokaler Nginx-Reverse-Proxy die öffentliche TLS-Verbindung; mit einer HTTP-Origin ist direkter Zugriff im vertrauenswürdigen Netz (z. B. VPN) möglich.
-- `APP_ORIGIN` ist die einzige erlaubte Origin für Schreibanfragen (ohne Pfad oder abschließenden `/`). `https://` erzwingt HTTPS und Secure-Cookies; `http://` erlaubt direkten HTTP-Betrieb ohne TLS.
-- **Zum Testen ohne echtes Zertifikat:** `sudo bash deploy/setup-https-selfsigned.sh <host-oder-ip>` installiert Nginx, erzeugt ein selbstsigniertes Zertifikat, richtet die HTTP→HTTPS-Umleitung ein und setzt `APP_ORIGIN`/`HOST` in `.env`. Einzelheiten: [Betrieb](betrieb.md).
-- Einzelheiten, die Nginx-Vorlage, `GRILLABEND_IMAGE` und das Backup des Volumes stehen unter [Betrieb](betrieb.md).
+- `APP_ORIGIN` enthält eine oder mehrere erlaubte Origins für Schreibanfragen (kommasepariert, ohne Pfad oder abschließenden `/`). `https://` erzwingt HTTPS und Secure-Cookies; `http://` erlaubt direkten HTTP-Betrieb ohne TLS.
+- **Selbstsigniertes HTTPS (Test):** `sudo bash deploy/setup-https-selfsigned.sh <host-oder-ip>` installiert Nginx, erzeugt ein selbstsigniertes Zertifikat, richtet die HTTP→HTTPS-Umleitung ein und setzt `APP_ORIGIN`/`HOST` in `.env`. Der Compose-Container heißt `grillabend`; Einzelheiten zu Nginx-Vorlage, `GRILLABEND_IMAGE` und Volume-Backup stehen unter [Betrieb](betrieb.md).
 
 ## Alternative: lokal mit Node
 

@@ -60,7 +60,7 @@ Node bindet standardmäßig an `0.0.0.0:PORT` (per `HOST` änderbar) und ist dam
 
 `deploy/nginx.conf.example` zeigt die nötige Konfiguration (Weiterleitung von Port 80 auf 443, Zertifikat, Upstream `127.0.0.1:1621`, Setzen von `Host` und Überschreiben von `X-Forwarded-Proto`, Anti-Framing-Header). Vor dem Einsatz Domain und **beide Dateipfade** ersetzen; keine Zertifikate oder privaten Schlüssel ins Repository übernehmen.
 
-### Selbstsigniertes HTTPS zum Testen
+### Selbstsigniertes HTTPS (Test)
 
 Für Tests ohne echtes Zertifikat richtet ein Skript Nginx mit einem selbstsignierten Zertifikat ein:
 
@@ -77,7 +77,7 @@ sudo bash deploy/setup-https-selfsigned.sh <host-oder-ip> [weitere-san...]
 ## Docker und Compose
 
 - Das `Dockerfile` erstellt ein Node-22-Produktionsimage (Debian Trixie slim, per Digest fixiert) mit `npm ci --omit=dev --ignore-scripts`. SQLite stammt aus Node selbst.
-- `compose.yaml` startet das Image mit dem persistenten Volume `grillabend-data` und verlangt eine konfigurierte `APP_ORIGIN`. Die versionierte `.env.example` enthält alle Angaben kommentiert; `.env` ist die lokale, ignorierte Kopie.
+- `compose.yaml` startet das Image im Container `grillabend` mit dem persistenten Volume `grillabend-data` und verlangt eine konfigurierte `APP_ORIGIN`. Die versionierte `.env.example` enthält alle Angaben kommentiert; `.env` ist die lokale, ignorierte Kopie.
 - Die dokumentierte Startweise setzt einen **Linux-Host mit Host-Netzwerk** voraus: Node ist auf `0.0.0.0:1621` erreichbar; mit `HOST=127.0.0.1` bleibt es auf den lokalen Proxy beschränkt. Der Host-Port 1621 liegt oberhalb der privilegierten Ports.
 
 ```sh

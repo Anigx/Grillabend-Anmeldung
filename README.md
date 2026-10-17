@@ -20,7 +20,7 @@ Internes Projektwissen (Architektur, Entscheidungen, Datenmodell, Changelog) ste
 ## Auf einen Blick
 
 - **Empfohlen: Docker.** `.env` aus `.env.example` erstellen, dort `APP_ORIGIN` als HTTPS-Origin aktivieren, dann `docker compose pull` und `docker compose up -d` (Details: [Betrieb](docs/handbuch/betrieb.md)).
-- **Sofort mit HTTPS testen:** `sudo bash deploy/setup-https-selfsigned.sh <host-oder-ip>` installiert Nginx, erzeugt ein selbstsigniertes Zertifikat, leitet HTTP auf HTTPS um und setzt `APP_ORIGIN`/`HOST` in `.env`. Später durch einen Proxy mit echtem Zertifikat ersetzbar.
+- **Selbstsigniertes HTTPS (Test):** `sudo bash deploy/setup-https-selfsigned.sh <host-oder-ip>` installiert Nginx, erzeugt ein selbstsigniertes Zertifikat, leitet HTTP auf HTTPS um und setzt `APP_ORIGIN`/`HOST` in `.env`. Später durch einen Proxy mit echtem Zertifikat ersetzbar.
 - **Lokal mit Node (Alternative):** Node.js ab 22.13, `npm ci --ignore-scripts` und `npm start`, danach <http://127.0.0.1:621> (SQLite kommt aus Node selbst, kein natives npm-Binding). Der Server bindet standardmäßig an `0.0.0.0` (per `HOST` änderbar) und ist damit auch über die Netzwerk-IP erreichbar.
 - **Erstes Admin-Konto:** Solange kein Admin existiert, leitet die Startseite auf `/setup` um; dort wird der Admin angelegt. Keine Admin-Umgebungsvariablen nötig.
 - **Passwort vergessen:** im Container `npm run reset-admin-password` (gibt ein neues Passwort aus).

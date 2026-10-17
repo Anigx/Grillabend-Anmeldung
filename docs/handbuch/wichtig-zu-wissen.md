@@ -25,5 +25,6 @@
 
 ## Technische Mindestanforderung
 
-- **Empfohlen wird der Betrieb per Docker/Compose** auf einem Linux-Host mit Host-Netzwerk und lokalem Nginx-Reverse-Proxy.
+- **Empfohlen wird der Betrieb per Docker/Compose** auf einem Linux-Host mit Host-Netzwerk und lokalem Nginx-Reverse-Proxy. Der Container heißt `grillabend`.
+- **Selbstsigniertes HTTPS (Test):** `deploy/setup-https-selfsigned.sh` richtet Nginx mit Testzertifikat, HTTP→HTTPS-Umleitung und passender `APP_ORIGIN` ein.
 - **Für den lokalen Betrieb ohne Docker:** Node.js ab 22.13 – ältere Versionen laden die Anwendung nicht.

@@ -1,6 +1,7 @@
 services:
   grillabend:
     image: ${GRILLABEND_IMAGE:-ghcr.io/anigx/grillabend-anmeldung:latest}
+    container_name: grillabend
     restart: unless-stopped
     network_mode: host
     env_file:
