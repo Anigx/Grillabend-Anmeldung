@@ -4,10 +4,19 @@ const fs = require('node:fs');
 const http = require('node:http');
 const os = require('node:os');
 const path = require('node:path');
+const { execFile } = require('node:child_process');
 const { DatabaseSync } = require('node:sqlite');
 const { createApp } = require('../server');
 const { tokenHash } = require('../src/security');
 const { scryptSync } = require('node:crypto');
+
+function runResetCli(rootDir, args = []) {
+    return new Promise(resolve => {
+        execFile(process.execPath, [path.join(__dirname, '..', 'src', 'reset-password.js'), ...args], {
+            env: { ...process.env, DATA_DIR: path.join(rootDir, 'data') }
+        }, (error, stdout, stderr) => resolve({ code: error?.code ?? 0, stdout, stderr }));
+    });
+}
 
 async function instance(legacyDir, options = {}) {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'grillabend-test-'));
@@ -43,9 +52,18 @@ async function instance(legacyDir, options = {}) {
     };
 }
 
+async function createAdmin(app, username = 'Organisator', password = 'Sicheres-Beispielpasswort1!') {
+    const created = await app.request('/api/setup', 'POST', { username, password });
+    assert.equal(created.status, 200, JSON.stringify(created.data));
+    const login = await app.request('/api/login', 'POST', { username, password });
+    assert.equal(login.status, 200);
+    return login;
+}
+
 test('öffentliche Registrierung erstellt nur Mitglieder, Daten bleiben privat und Cookies autorisieren Änderungen', async () => {
     const app = await instance();
     try {
+        await createAdmin(app);
         assert.equal((await app.request('/api/attendees')).status, 401);
         assert.equal((await app.request('/api/party-info')).status, 401);
         assert.equal((await app.request('/api/admin/party-info')).status, 401);
@@ -90,13 +108,9 @@ test('öffentliche Registrierung erstellt nur Mitglieder, Daten bleiben privat u
 });
 
 test('Namensanzeige ist freiwillig, Änderungen wirken nur für das eigene Konto und Antworten bleiben bestehen', async () => {
-    process.env.ADMIN_USERNAME = 'Organisator';
-    process.env.ADMIN_PASSWORD = 'ein-sicheres-Beispielpasswort';
-    let app;
-    try { app = await instance(); }
-    finally { delete process.env.ADMIN_USERNAME; delete process.env.ADMIN_PASSWORD; }
+    const app = await instance();
     try {
-        const admin = await app.request('/api/login', 'POST', { username: 'Organisator', password: 'ein-sicheres-Beispielpasswort' });
+        const admin = await createAdmin(app, 'Organisator', 'Sicheres-Beispielpasswort1!');
         const alice = await app.request('/api/register', 'POST', { username: 'Alice', password: 'ein-lang-genuges-Testpasswort1' });
         const bob = await app.request('/api/register', 'POST', { username: 'Bob', password: 'ein-lang-genuges-Testpasswort1' });
         assert.equal((await app.request('/api/session', 'GET', null, alice.cookie)).data.show_name, true);
@@ -205,30 +219,22 @@ test('parallel begonnene Anmeldung mit altem Passwort behält nach einem Passwor
     } finally { await app.close(); }
 });
 
-test('startkonfiguriertes Admin-Konto kann Namen und Passwort nur über die Serverkonfiguration wechseln', async () => {
-    process.env.ADMIN_USERNAME = 'Organisator';
-    process.env.ADMIN_PASSWORD = 'ein-sicheres-Beispielpasswort';
-    let app;
-    try { app = await instance(); }
-    finally { delete process.env.ADMIN_USERNAME; delete process.env.ADMIN_PASSWORD; }
+test('über die Ersteinrichtung angelegter Admin kann Namen und Passwort selbst über die UI ändern', async () => {
+    const app = await instance();
     try {
-        const admin = await app.request('/api/login', 'POST', { username: 'Organisator', password: 'ein-sicheres-Beispielpasswort' });
-        assert.equal(admin.data.account_managed, true);
-        assert.equal((await app.request('/api/profile/username', 'PUT', { username: 'Anderer Admin', current_password: 'ein-sicheres-Beispielpasswort' }, admin.cookie)).status, 409);
-        assert.equal((await app.request('/api/profile/password', 'PUT', { current_password: 'ein-sicheres-Beispielpasswort', new_password: 'Anderes-GutesPasswort123!' }, admin.cookie)).status, 409);
-        assert.equal((await app.request('/api/session', 'GET', null, admin.cookie)).data.username, 'Organisator');
-        assert.equal((await app.request('/api/login', 'POST', { username: 'Organisator', password: 'ein-sicheres-Beispielpasswort' })).status, 200);
+        const admin = await createAdmin(app, 'Organisator', 'Sicheres-Beispielpasswort1!');
+        assert.equal(admin.data.is_admin, true);
+        assert.equal((await app.request('/api/profile/username', 'PUT', { username: 'Anderer Admin', current_password: 'Sicheres-Beispielpasswort1!' }, admin.cookie)).status, 200);
+        assert.equal((await app.request('/api/session', 'GET', null, admin.cookie)).data.username, 'Anderer Admin');
+        assert.equal((await app.request('/api/profile/password', 'PUT', { current_password: 'Sicheres-Beispielpasswort1!', new_password: 'Anderes-GutesPasswort123!' }, admin.cookie)).status, 200);
+        assert.equal((await app.request('/api/login', 'POST', { username: 'Anderer Admin', password: 'Anderes-GutesPasswort123!' })).status, 200);
     } finally { await app.close(); }
 });
 
 test('Admin wird separat angelegt; Kapazitäten und Bearbeitung fremder Daten sind geschützt', async () => {
-    process.env.ADMIN_USERNAME = 'Organisator';
-    process.env.ADMIN_PASSWORD = 'ein-sicheres-Beispielpasswort';
-    let app;
-    try { app = await instance(); }
-    finally { delete process.env.ADMIN_USERNAME; delete process.env.ADMIN_PASSWORD; }
+    const app = await instance();
     try {
-        const admin = await app.request('/api/login', 'POST', { username: 'Organisator', password: 'ein-sicheres-Beispielpasswort' });
+        const admin = await createAdmin(app, 'Organisator', 'Sicheres-Beispielpasswort1!');
         assert.equal(admin.data.is_admin, true);
         const party = {
             date: 'Samstag 19 Uhr', location_name: 'Hütte', location_address: 'Berlin', maps_url: 'https://maps.google.com/',
@@ -265,14 +271,10 @@ test('Admin wird separat angelegt; Kapazitäten und Bearbeitung fremder Daten si
 });
 
 test('Admin-Userübersicht zeigt alle Konten mit Antworten, aber ohne Zugangsdaten', async () => {
-    process.env.ADMIN_USERNAME = 'Organisator';
-    process.env.ADMIN_PASSWORD = 'ein-sicheres-Beispielpasswort';
-    let app;
-    try { app = await instance(); }
-    finally { delete process.env.ADMIN_USERNAME; delete process.env.ADMIN_PASSWORD; }
+    const app = await instance();
     try {
         assert.equal((await app.request('/api/admin/users')).status, 401);
-        const admin = await app.request('/api/login', 'POST', { username: 'Organisator', password: 'ein-sicheres-Beispielpasswort' });
+        const admin = await createAdmin(app, 'Organisator', 'Sicheres-Beispielpasswort1!');
         const guest = await app.request('/api/register', 'POST', { username: 'Mara', password: 'ein-lang-genuges-Testpasswort1' });
         const noAnswer = await app.request('/api/register', 'POST', { username: 'Nina', password: 'ein-lang-genuges-Testpasswort1' });
         assert.equal((await app.request('/api/admin/users', 'GET', null, guest.cookie)).status, 403);
@@ -307,13 +309,9 @@ test('Admin-Userübersicht zeigt alle Konten mit Antworten, aber ohne Zugangsdat
 });
 
 test('Neuer Grillabend setzt nur Antworten nach erneuter Admin-Passwortprüfung zurück', async () => {
-    process.env.ADMIN_USERNAME = 'Organisator';
-    process.env.ADMIN_PASSWORD = 'ein-sicheres-Beispielpasswort';
-    let app;
-    try { app = await instance(); }
-    finally { delete process.env.ADMIN_USERNAME; delete process.env.ADMIN_PASSWORD; }
+    const app = await instance();
     try {
-        const admin = await app.request('/api/login', 'POST', { username: 'Organisator', password: 'ein-sicheres-Beispielpasswort' });
+        const admin = await createAdmin(app, 'Organisator', 'Sicheres-Beispielpasswort1!');
         const guest = await app.request('/api/register', 'POST', { username: 'Mara', password: 'ein-lang-genuges-Testpasswort1' });
         const other = await app.request('/api/register', 'POST', { username: 'Nina', password: 'ein-lang-genuges-Testpasswort2' });
         const party = {
@@ -330,7 +328,7 @@ test('Neuer Grillabend setzt nur Antworten nach erneuter Admin-Passwortprüfung 
         assert.match(html, /id="resetPassword" name="password" type="password"/);
         const route = '/api/admin/reset-rsvps';
         await app.db.run("INSERT INTO rsvps_legacy_names VALUES ('Archivierter Testname', 'Ja', 'Nein', 'Nein', 'Nein', '2026-01-01')");
-        const correct = { password: 'ein-sicheres-Beispielpasswort' };
+        const correct = { password: 'Sicheres-Beispielpasswort1!' };
         assert.equal((await app.request(route, 'POST', correct)).status, 401);
         assert.equal((await app.request(route, 'POST', correct, guest.cookie)).status, 403);
         assert.equal((await app.request(route, 'POST', correct, admin.cookie, 'https://fremd.example')).status, 403);
@@ -357,43 +355,40 @@ test('Neuer Grillabend setzt nur Antworten nach erneuter Admin-Passwortprüfung 
     } finally { await app.close(); }
 });
 
-test('Neustart mit geändertem Admin-Passwort rotiert den Hash und widerruft nur Admin-Sitzungen', async () => {
-    const dataRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'grillabend-rotation-'));
-    const previousName = process.env.ADMIN_USERNAME;
-    const previousPassword = process.env.ADMIN_PASSWORD;
-    const dataDir = path.join(dataRoot, 'data');
-    const firstPassword = 'synthetisches-Adminpasswort-1';
-    const nextPassword = 'synthetisches-Adminpasswort-2';
-    let app;
+test('Startseite leitet ohne Admin auf die Ersteinrichtung um und ist danach gesperrt', async () => {
+    const app = await instance();
     try {
-        process.env.ADMIN_USERNAME = 'Auditadmin';
-        process.env.ADMIN_PASSWORD = firstPassword;
-        app = await instance(dataRoot, { dataDir });
-        const admin = await app.request('/api/login', 'POST', { username: 'Auditadmin', password: firstPassword });
-        const member = await app.request('/api/register', 'POST', { username: 'Mitglied', password: 'synthetisches-Mitgliedspasswort1' });
-        assert.equal(admin.status, 200);
-        assert.equal(member.status, 200);
-        await app.close();
-        app = null;
-        app = await instance(dataRoot, { dataDir });
-        assert.equal((await app.request('/api/session', 'GET', null, admin.cookie)).data.username, 'Auditadmin');
-        await app.close();
-        app = null;
+        const first = await fetch(app.base, { redirect: 'manual' });
+        assert.equal(first.status, 302);
+        assert.equal(first.headers.get('location'), '/setup');
+        const setup = await fetch(`${app.base}/setup`);
+        assert.equal(setup.status, 200);
+        const html = await setup.text();
+        assert.match(html, /id="setupForm"/);
+        assert.match(html, /src="\/js\/setup.js"/);
+        assert.equal((await fetch(`${app.base}/js/setup.js`)).status, 200);
+        await createAdmin(app);
+        const blocked = await fetch(`${app.base}/setup`, { redirect: 'manual' });
+        assert.equal(blocked.status, 302);
+        assert.equal(blocked.headers.get('location'), '/');
+        assert.equal((await fetch(app.base)).status, 200);
+    } finally { await app.close(); }
+});
 
-        process.env.ADMIN_PASSWORD = nextPassword;
-        app = await instance(dataRoot, { dataDir });
-        assert.equal((await app.request('/api/session', 'GET', null, admin.cookie)).data.username, null);
-        assert.equal((await app.request('/api/login', 'POST', { username: 'Auditadmin', password: firstPassword })).status, 401);
-        const rotated = await app.request('/api/login', 'POST', { username: 'Auditadmin', password: nextPassword });
-        assert.equal(rotated.data.is_admin, true);
-        assert.equal((await app.request('/api/session', 'GET', null, member.cookie)).data.username, 'Mitglied');
-        assert.equal((await app.db.get('SELECT COUNT(*) AS count FROM sessions WHERE user_id = (SELECT id FROM users WHERE username = ?)', ['Auditadmin'])).count, 1);
-    } finally {
-        if (app) await app.close();
-        if (previousName === undefined) delete process.env.ADMIN_USERNAME; else process.env.ADMIN_USERNAME = previousName;
-        if (previousPassword === undefined) delete process.env.ADMIN_PASSWORD; else process.env.ADMIN_PASSWORD = previousPassword;
-        fs.rmSync(dataRoot, { recursive: true, force: true });
-    }
+test('Ersteinrichtung legt den ersten Admin an, vergibt keine Adminrechte über die Registrierung und ist danach gesperrt', async () => {
+    const app = await instance();
+    try {
+        assert.equal((await app.request('/api/setup', 'POST', { username: 'Organisator', password: 'kurz' })).status, 400);
+        assert.equal((await app.request('/api/setup', 'POST', { username: '<script>', password: 'Sicheres-Beispielpasswort1!' })).status, 400);
+        assert.equal((await app.request('/api/setup', 'POST', { username: 'Organisator', password: 'Sicheres-Beispielpasswort1!' })).status, 200);
+        assert.equal((await app.request('/api/setup', 'POST', { username: 'Zweiter', password: 'Sicheres-Beispielpasswort2!' })).status, 409);
+        assert.equal((await app.request('/api/setup', 'POST', { username: 'Organisator', password: 'Sicheres-Beispielpasswort1!' })).status, 409);
+        assert.equal((await app.request('/api/login', 'POST', { username: 'Organisator', password: 'Sicheres-Beispielpasswort1!' })).data.is_admin, true);
+        assert.equal((await app.db.get('SELECT COUNT(*) AS count FROM users WHERE is_admin = 1')).count, 1);
+        const guest = await app.request('/api/register', 'POST', { username: 'Gast', password: 'ein-lang-genuges-Testpasswort1', is_admin: true });
+        assert.equal(guest.data.is_admin, false);
+        assert.equal((await app.db.get('SELECT COUNT(*) AS count FROM users WHERE is_admin = 1')).count, 1);
+    } finally { await app.close(); }
 });
 
 function createLegacy(filename, sql) {
@@ -634,13 +629,9 @@ test('APP_ORIGIN bindet Schreibanfragen an die konfigurierte HTTPS-/Host-/Port-K
 });
 
 test('Admin-API prüft Rolle und Eingaben; fremde RSVP-Änderungen bleiben unmöglich', async () => {
-    process.env.ADMIN_USERNAME = 'Admin';
-    process.env.ADMIN_PASSWORD = 'ein-lang-genuges-Testpasswort';
-    let app;
-    try { app = await instance(); }
-    finally { delete process.env.ADMIN_USERNAME; delete process.env.ADMIN_PASSWORD; }
+    const app = await instance();
     try {
-        const admin = await app.request('/api/login', 'POST', { username: 'Admin', password: 'ein-lang-genuges-Testpasswort' });
+        const admin = await createAdmin(app, 'Admin', 'Sicheres-Beispielpasswort1!');
         const guest = await app.request('/api/register', 'POST', { username: 'Gaby', password: 'ein-lang-genuges-Testpasswort1' });
         const fields = { date: 'Samstag', location_name: 'Hütte', location_address: 'Ort', maps_url: 'https://maps.google.com/', max_cabin_capacity: 1, max_luftmatratze: 1, max_bettzeug: 1, rules: 'Regeln', info: 'Info' };
         assert.equal((await app.request('/api/admin/party-info', 'PUT', { ...fields, username: 'Admin', is_admin: true }, guest.cookie)).status, 403);
@@ -662,13 +653,9 @@ test('Admin-API prüft Rolle und Eingaben; fremde RSVP-Änderungen bleiben unmö
 });
 
 test('bei gleichzeitigem RSVP gewinnt höchstens ein Benutzer den letzten freien Platz', async () => {
-    process.env.ADMIN_USERNAME = 'Admin';
-    process.env.ADMIN_PASSWORD = 'ein-lang-genuges-Testpasswort';
-    let app;
-    try { app = await instance(); }
-    finally { delete process.env.ADMIN_USERNAME; delete process.env.ADMIN_PASSWORD; }
+    const app = await instance();
     try {
-        const admin = await app.request('/api/login', 'POST', { username: 'Admin', password: 'ein-lang-genuges-Testpasswort' });
+        const admin = await createAdmin(app, 'Admin', 'Sicheres-Beispielpasswort1!');
         const config = { date: '', location_name: '', location_address: '', maps_url: '', max_cabin_capacity: 1, max_luftmatratze: 1, max_bettzeug: 1, rules: '', info: '' };
         assert.equal((await app.request('/api/admin/party-info', 'PUT', config, admin.cookie)).status, 200);
         const a = await app.request('/api/register', 'POST', { username: 'Erster', password: 'ein-lang-genuges-Testpasswort1' });
@@ -733,13 +720,9 @@ test('unvollständige Alt-Passwörter werden nicht als berechenbare neue Passwö
 });
 
 test('Admin setzt und entfernt einen Karten-Pin; der Google-Link wird aus Koordinaten erzeugt', async () => {
-    process.env.ADMIN_USERNAME = 'Kartenadmin';
-    process.env.ADMIN_PASSWORD = 'ein-lang-genuges-Testpasswort';
-    let app;
-    try { app = await instance(); }
-    finally { delete process.env.ADMIN_USERNAME; delete process.env.ADMIN_PASSWORD; }
+    const app = await instance();
     try {
-        const admin = await app.request('/api/login', 'POST', { username: 'Kartenadmin', password: 'ein-lang-genuges-Testpasswort' });
+        const admin = await createAdmin(app, 'Kartenadmin', 'Sicheres-Beispielpasswort1!');
         const guest = await app.request('/api/register', 'POST', { username: 'Gast', password: 'ein-lang-genuges-Testpasswort1' });
         const fields = { date: 'Heute', location_name: 'Treffpunkt', location_address: 'Berlin', maps_url: 'https://maps.google.com/',
             max_cabin_capacity: 15, max_luftmatratze: 10, max_bettzeug: 10, rules: '', info: '' };
@@ -841,16 +824,12 @@ test('einmalige Namensmigration aktiviert bestehende Konten und überschreibt sp
             assert.ok(await first.db.get('SELECT value FROM metadata WHERE key = ?', ['names_visible_once']));
             await first.db.run('UPDATE users SET show_name = 0 WHERE username = ?', ['Bestandskonto']);
         } finally { await first.db.close(); }
-        const previousName = process.env.ADMIN_USERNAME;
-        const previousPassword = process.env.ADMIN_PASSWORD;
-        process.env.ADMIN_USERNAME = 'NeuerAdmin';
-        process.env.ADMIN_PASSWORD = 'synthetisches-Adminpasswort-1';
+        const seeded = new DatabaseSync(path.join(dataDir, 'app.sqlite'));
+        try {
+            seeded.prepare("INSERT INTO users (username, password_hash, is_admin, show_name) VALUES ('NeuerAdmin', 'synthetischer-Althash', 1, 1)").run();
+        } finally { seeded.close(); }
         let restarted;
-        try { restarted = await createApp({ dataDir, legacyDir: root }); }
-        finally {
-            if (previousName === undefined) delete process.env.ADMIN_USERNAME; else process.env.ADMIN_USERNAME = previousName;
-            if (previousPassword === undefined) delete process.env.ADMIN_PASSWORD; else process.env.ADMIN_PASSWORD = previousPassword;
-        }
+        restarted = await createApp({ dataDir, legacyDir: root });
         try {
             assert.equal((await restarted.db.get('SELECT show_name FROM users WHERE username = ?', ['Bestandskonto'])).show_name, 0);
             assert.equal((await restarted.db.get('SELECT show_name FROM users WHERE username = ?', ['NeuerAdmin'])).show_name, 1);
@@ -978,31 +957,6 @@ test('erfolgreicher Login aktualisiert alte scrypt-Kosten, falsche Logins änder
     } finally { await app.close(); }
 });
 
-test('Adminstart aktualisiert alte scrypt-Kosten ohne Sitzungswiderruf bei unverändertem Passwort', async () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'grillabend-admin-rehash-'));
-    const previousName = process.env.ADMIN_USERNAME;
-    const previousPassword = process.env.ADMIN_PASSWORD;
-    const password = 'Kuenstliches-Adminrehashpasswort123!';
-    let app;
-    try {
-        process.env.ADMIN_USERNAME = 'RehashAdmin'; process.env.ADMIN_PASSWORD = password;
-        app = await instance(root, { dataDir: root });
-        const login = await app.request('/api/login', 'POST', { username: 'RehashAdmin', password });
-        const salt = Buffer.alloc(16, 0x42);
-        const legacy = `scrypt:${salt.toString('hex')}:${scryptSync(password, salt, 64, { N: 16384, r: 8, p: 1 }).toString('hex')}`;
-        await app.db.run('UPDATE users SET password_hash = ?', [legacy]);
-        await app.close(); app = null;
-        app = await instance(root, { dataDir: root });
-        assert.match((await app.db.get('SELECT password_hash FROM users')).password_hash, /^scrypt:v1:16384:8:5:/);
-        assert.equal((await app.request('/api/session', 'GET', null, login.cookie)).data.is_admin, true);
-    } finally {
-        if (app) await app.close();
-        if (previousName === undefined) delete process.env.ADMIN_USERNAME; else process.env.ADMIN_USERNAME = previousName;
-        if (previousPassword === undefined) delete process.env.ADMIN_PASSWORD; else process.env.ADMIN_PASSWORD = previousPassword;
-        fs.rmSync(root, { recursive: true, force: true });
-    }
-});
-
 test('gleichzeitiges Legacy-Rehash und Passwortwechsel können keine alte Sitzung neu ausstellen', async () => {
     const app = await instance();
     try {
@@ -1021,5 +975,49 @@ test('gleichzeitiges Legacy-Rehash und Passwortwechsel können keine alte Sitzun
         if (oldLogin.cookie) assert.equal((await app.request('/api/session', 'GET', null, oldLogin.cookie)).data.username, null);
         assert.equal((await app.request('/api/login', 'POST', { username: 'RehashRace', password })).status, 401);
         assert.equal((await app.request('/api/login', 'POST', { username: 'RehashRace', password: nextPassword })).status, 200);
+    } finally { await app.close(); }
+});
+
+test('reset-admin-password setzt im laufenden Betrieb ein neues Passwort und gibt es aus', async () => {
+    const app = await instance();
+    try {
+        const password = 'Sicheres-Beispielpasswort1!';
+        const admin = await createAdmin(app, 'Organisator', password);
+        const second = await app.request('/api/login', 'POST', { username: 'Organisator', password });
+        assert.equal(second.status, 200);
+        const { code, stdout } = await runResetCli(app.root);
+        assert.equal(code, 0);
+        assert.match(stdout, /Benutzer: Organisator/);
+        const match = /Passwort: (\S+)/.exec(stdout);
+        assert.ok(match, `Ausgabe ohne Passwort: ${stdout}`);
+        const newPassword = match[1];
+        assert.match(newPassword, /\p{Lu}/u);
+        assert.match(newPassword, /\p{Ll}/u);
+        assert.match(newPassword, /\d/u);
+        assert.match(newPassword, /[^\p{L}\p{N}\s]/u);
+        assert.equal((await app.request('/api/session', 'GET', null, admin.cookie)).data.username, null);
+        assert.equal((await app.request('/api/session', 'GET', null, second.cookie)).data.username, null);
+        assert.equal((await app.request('/api/login', 'POST', { username: 'Organisator', password })).status, 401);
+        assert.equal((await app.request('/api/login', 'POST', { username: 'Organisator', password: newPassword })).data.is_admin, true);
+    } finally { await app.close(); }
+});
+
+test('reset-admin-password scheitert ohne Admin und verlangt bei mehreren Admins einen Namen', async () => {
+    const app = await instance();
+    try {
+        const empty = await runResetCli(app.root);
+        assert.equal(empty.code, 1);
+        assert.match(empty.stderr, /Kein Admin-Konto/);
+        await createAdmin(app, 'Erster', 'Sicheres-Beispielpasswort1!');
+        await app.db.run("INSERT INTO users (username, password_hash, is_admin, show_name) VALUES ('Zweiter', 'synthetischer-Althash', 1, 1)");
+        const ambiguous = await runResetCli(app.root);
+        assert.equal(ambiguous.code, 1);
+        assert.match(ambiguous.stderr, /Mehrere Admin-Konten/);
+        const missing = await runResetCli(app.root, ['Unbekannt']);
+        assert.equal(missing.code, 1);
+        assert.match(missing.stderr, /Kein Admin-Konto mit dem Namen/);
+        const named = await runResetCli(app.root, ['Zweiter']);
+        assert.equal(named.code, 0);
+        assert.match(named.stdout, /Benutzer: Zweiter/);
     } finally { await app.close(); }
 });

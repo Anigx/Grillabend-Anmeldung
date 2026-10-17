@@ -21,14 +21,16 @@ Internes Projektwissen (Architektur, Entscheidungen, Datenmodell, Changelog) ste
 
 - **Voraussetzung:** Node.js ab 22.13 (SQLite kommt aus Node selbst, kein natives npm-Binding).
 - **Lokal starten:** `npm ci --ignore-scripts` und `npm start`, danach <http://127.0.0.1:621>.
+- **Erstes Admin-Konto:** Solange kein Admin existiert, leitet die Startseite auf `/setup` um; dort wird der Admin angelegt. Keine Admin-Umgebungsvariablen nötig.
+- **Passwort vergessen:** im Container `npm run reset-admin-password` (gibt ein neues Passwort aus).
 - **Tests:** `npm test` (ausschließlich temporäre, künstliche Datenbanken).
 - **Ein Abend gleichzeitig** mit offener Registrierung und serverseitigen Sessions.
 
 ## Projektstruktur
 
 - `server.js` – kleiner Startpunkt; `src/server.js` – HTTP-Routen, Sitzungen und Kapazitätslogik.
-- `src/db.js`, `src/security.js`, `src/auth-limit.js` – SQLite-Initialisierung/Alt-Import, Passwort-/Token-Funktionen und Auth-Limits.
-- `public/` – `index.html`/`js/app.js` (Anmeldung und Teilnahme), `admin.html`/`js/admin.js` (Adminoberfläche), `css/`.
+- `src/db.js`, `src/security.js`, `src/auth-limit.js` – SQLite-Initialisierung/Alt-Import, Passwort-/Token-Funktionen und Auth-Limits; `src/reset-password.js` – CLI zum Zurücksetzen des Admin-Passworts.
+- `public/` – `index.html`/`js/app.js` (Anmeldung und Teilnahme), `setup.html`/`js/setup.js` (Ersteinrichtung), `admin.html`/`js/admin.js` (Adminoberfläche), `css/`.
 - `test/` – automatisierte Tests.
 - `docs/handbuch/` – Anwender-/Betriebsdoku; `docs/wiki/` – internes Projektwissen.
 - `data/app.sqlite` – lokale Datenbank (nicht über HTTP ausgeliefert, von Git ausgeschlossen).

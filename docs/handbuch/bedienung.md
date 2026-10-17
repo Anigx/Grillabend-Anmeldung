@@ -17,11 +17,15 @@ Unter „Wer ist schon dabei?“ stehen Zusagen, „Vielleicht“, belegte Schla
 
 - **Namensanzeige:** Schiebeschalter, ob dein Name in der Teilnehmerliste erscheint; ohne Häkchen steht „Anonym“. Admins sehen deinen Namen weiterhin.
 - **Benutzernamen ändern** und **Passwort ändern** (jeweils mit aktuellem Passwort). Nach einem Passwortwechsel werden andere Sitzungen beendet.
-- Startverwaltete Admin-Konten können Name und Passwort hier nicht ändern (Hinweis zur Serverkonfiguration).
+- Auch Admin-Konten sind normale Konten und können Name und Passwort hier ändern.
 
 ## Für Admins (`/admin`)
 
 Der Adminbereich ist über den Link auf der Teilnehmerseite oder direkt unter `/admin` erreichbar und erfordert eine serverseitig geprüfte Admin-Sitzung.
+
+### Erstes Admin-Konto
+
+Gibt es noch keinen Admin, leitet die Startseite automatisch auf `/setup` um. Dort wird einmalig das erste Admin-Konto angelegt (siehe [Installation](installation.md)). Sobald ein Admin existiert, ist `/setup` gesperrt.
 
 ### Tab „Veranstaltung“
 

@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="de">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#0a0a16">
+    <title>Grillabend – Ersteinrichtung</title>
+    <meta name="description" content="Erstes Admin-Konto für den Grillabend anlegen.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="/css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <script src="/js/setup.js" defer></script>
+</head>
+<body>
+    <div class="background-animation" aria-hidden="true"></div>
+
+    <main class="container auth-container" id="setupContainer">
+        <header class="page-intro auth-intro">
+            <span class="brand-mark" aria-hidden="true">🐾</span>
+            <h1>Ersteinrichtung</h1>
+            <p>Es ist noch kein Admin-Konto vorhanden. Lege jetzt das erste Admin-Konto an, um den Grillabend zu verwalten.</p>
+        </header>
+        <form id="setupForm">
+            <h2 class="form-title">Admin-Konto anlegen</h2>
+            <p class="form-description">Dieses Konto darf den Termin, den Ort, die Regeln und alle Antworten verwalten.</p>
+            <div class="form-group">
+                <label for="username">Benutzername</label>
+                <input id="username" name="username" type="text" autocomplete="username" spellcheck="false" maxlength="40" minlength="2" required>
+            </div>
+            <div class="form-group">
+                <label for="password">Passwort</label>
+                <input id="password" name="password" type="password" autocomplete="new-password" minlength="12" aria-describedby="passwordStrength" required>
+            </div>
+            <div class="form-group">
+                <label for="confirmPassword">Passwort wiederholen</label>
+                <input id="confirmPassword" name="confirmPassword" type="password" autocomplete="new-password" aria-describedby="confirmHint" required>
+                <p id="confirmHint" class="field-hint hidden" role="status" aria-live="polite"></p>
+            </div>
+            <div class="password-strength-card" role="group" aria-label="Passwortstärke">
+                <p id="passwordStrength" class="strength-label" role="status" aria-live="polite">Passwortstärke: Noch kein Passwort</p>
+                <div class="strength-track" aria-hidden="true"><span id="strengthFill"></span></div>
+            </div>
+            <div class="requirements-panel" role="group" aria-label="Passwortvorgaben">
+                <p class="requirements-title">Passwortvorgaben</p>
+                <ul class="password-requirements">
+                    <li id="requireLength">Mindestens 12 Zeichen</li>
+                    <li id="requireUpper">Großbuchstabe</li>
+                    <li id="requireLower">Kleinbuchstabe</li>
+                    <li id="requireNumber">Zahl</li>
+                    <li id="requireSpecial">Sonderzeichen</li>
+                </ul>
+            </div>
+            <div class="form-actions">
+                <button class="submit-btn" id="setupSubmitBtn" type="submit">Admin-Konto anlegen</button>
+            </div>
+            <p id="setupMessage" class="hidden message" role="status" aria-live="polite"></p>
+        </form>
+    </main>
+
+</body>
+</html>

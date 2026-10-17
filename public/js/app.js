@@ -102,9 +102,6 @@ document.addEventListener('DOMContentLoaded', () => {
         el('loggedInUser').textContent = user.username;
         el('adminBtn').classList.toggle('hidden', !user.is_admin);
         el('showName').checked = user.show_name;
-        el('accountManagedNote').classList.toggle('hidden', !user.account_managed);
-        el('usernameForm').classList.toggle('hidden', Boolean(user.account_managed));
-        el('passwordForm').classList.toggle('hidden', Boolean(user.account_managed));
     }
 
     function showParty() {

@@ -31,20 +31,18 @@ npm test
 
 ## Erstes Admin-Konto einrichten
 
-Vor dem ersten `npm start` beide Umgebungsvariablen setzen (Passwort mindestens zwölf Zeichen):
+Ein Admin-Konto wird beim ersten Start **in der Oberfläche** angelegt, nicht über Umgebungsvariablen:
 
-```powershell
-$env:ADMIN_USERNAME = 'Organisator'
-$env:ADMIN_PASSWORD = 'ein-sehr-langes-passwort'
-npm.cmd start
-```
+1. `npm start` ausführen und <http://127.0.0.1:621> öffnen.
+2. Solange kein Admin existiert, leitet die Startseite automatisch auf `/setup` um. Dort Benutzername (2–40 Zeichen) und Passwort (mindestens zwölf Zeichen mit Groß- und Kleinbuchstaben, Zahl und Sonderzeichen) eingeben.
+3. Nach dem Anlegen zur Anmeldung zurückkehren und mit dem neuen Konto anmelden.
 
-- Beim Start legt der Server dieses Konto als Admin an; es kann Name und Passwort **nicht** im Einstellungsdialog ändern, sondern wird über die Startkonfiguration verwaltet.
+- `/setup` ist nur so lange erreichbar, wie **kein** Konto mit Adminrechten existiert; danach leitet die Seite auf die Startseite um.
 - Die **erste öffentliche Registrierung erhält keine Adminrechte.**
-- Sind die Variablen nicht gesetzt, ist Registrierung möglich, der Adminbereich aber erst nach Einrichtung eines Administrators verfügbar.
+- Der über `/setup` angelegte Admin ist ein normales Konto und kann Name und Passwort später selbst im Einstellungsdialog ändern.
 - Admin-Konten erreichen den eigenen Bereich über den Link auf der Teilnehmerseite oder direkt unter `/admin`.
 
-Wird später ein abweichendes `ADMIN_PASSWORD` gesetzt und der Prozess neu gestartet, wird das Passwort des vorhandenen Admin-Kontos rotiert und dessen bisherige Sitzungen werden ungültig. Bei unverändertem Passwort bleiben sie gültig. Geheimnisse nie in versionierte Dateien oder das Wiki schreiben; für Docker Compose die private, von Git ausgeschlossene `.env` verwenden.
+Geht das Admin-Passwort verloren, lässt es sich im Container mit `npm run reset-admin-password` zurücksetzen (siehe [Betrieb](betrieb.md)). Geheimnisse nie in versionierte Dateien oder das Wiki schreiben.
 
 ## Erster Start und Datenbestand
 

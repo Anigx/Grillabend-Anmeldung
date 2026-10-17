@@ -5,7 +5,8 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "test": "node --test"
+    "test": "node --test",
+    "reset-admin-password": "node src/reset-password.js"
   },
   "keywords": [],
   "author": "",

@@ -17,14 +17,14 @@ Dieses Dokument beschreibt die Schutzmaßnahmen der Anwendung, den Stand eines s
 - **Offene Registrierung:** Jeder kann sich anlegen und die Veranstaltungs- und Antwortdaten einsehen. Das ist so gewollt; ein Schutz vor Selbstregistrierung ist nicht Teil der Anwendung.
 - **Statische Routen ohne globales Rate-Limit:** Nur Auth-Routen sind limitiert; die Auslieferung von HTML/CSS/JS/Vendor-Bibliotheken ist es nicht (geringes DoS-Risiko, im privaten Umfeld akzeptabel).
 - **Kein Mehrinstanz-Schutz:** Kapazitätsprüfungen und Auth-Limits gelten nur innerhalb eines Prozesses. Vor Mehrfachbetrieb wäre eine gemeinsame atomare Reservierung nötig.
-- **Geheimnisse:** `ADMIN_USERNAME`/`ADMIN_PASSWORD`, `.env` und Zertifikate dürfen nie ins Repository. Für Docker Compose die ignorierte `.env` verwenden.
+- **Geheimnisse:** `.env`, Zertifikate und das über die Ersteinrichtung vergebene bzw. per `reset-admin-password` erzeugte Passwort dürfen nie ins Repository. Für Docker Compose die ignorierte `.env` verwenden.
 - **Konfigurationsquelle:** `process.env.*` wird als vertrauenswürdige Betreiber-Eingabe behandelt, nicht als Angreifer-Eingabe.
 
 ## Schwachstellen-Scan (Stand 2026-10-17)
 
 - **Werkzeug:** CodeQL 2.27.1, Sprache JavaScript, Modus „important only“ (126 Queries), Pack `codeql/javascript-queries` 2.4.6, Threat model remote.
 - **Ergebnis:** 8 Findings, alle in `src/server.js`; **kein kritischer oder ausnutzbarer Befund im geänderten Code** (Datenbank-Migration, RSVP-, Admin-API und Frontend).
-  - 2 × `user-controlled-bypass` (Level *error*): keine echten Schwachstellen – die „Quelle“ ist einmal `process.env.ADMIN_*` (Betreiber-Konfiguration) und einmal die reguläre Login-Eingabeprüfung.
+  - 2 × `user-controlled-bypass` (Level *error*): keine echten Schwachstellen – die „Quelle“ ist einmal die Betreiberkonfiguration (`process.env.*`) und einmal die reguläre Login-Eingabeprüfung.
   - 6 × `missing-rate-limiting` (Warnung): die Login-Route besitzt bereits ein eigenes Limit; die statischen Datei-Routen sind bewusst nicht limitiert.
 - **Datenextensions:** nicht nötig – keine projekteigenen Wrapper um Sources/Sinks außer Express (modelliert); DB-Zugriff ist parametrisiert.
 - **Kein Beweis der Abwesenheit:** Ein statischer Scan findet typische Muster, keine Logikfehler, und kann nicht modellierte Senken übersehen.

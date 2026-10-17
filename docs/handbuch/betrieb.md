@@ -8,7 +8,8 @@
 | `DATA_DIR` | `data/` (im Projektordner) | Ordner der SQLite-Datenbank. |
 | `APP_ORIGIN` | – | Einzige zulässige öffentliche Origin für Schreibanfragen (Schema, Host, optional Port) – **ohne** abschließenden Slash oder Pfad. In Produktion zwingend HTTPS. Ohne die Variable wird die Origin aus Anfrageprotokoll und Host abgeleitet. |
 | `NODE_ENV` | – | `production` setzt das Session-Cookie auf `Secure`, bindet Node nur an `127.0.0.1` und verlangt bestätigtes HTTPS. |
-| `ADMIN_USERNAME` / `ADMIN_PASSWORD` | – | Richten beim Start ein verwaltetes Admin-Konto ein (Passwort mindestens zwölf Zeichen). Nur gemeinsam setzen. |
+
+Ein Admin-Konto wird nicht mehr über Umgebungsvariablen angelegt, sondern beim ersten Aufruf über die Ersteinrichtung (`/setup`, siehe [Installation](installation.md)).
 
 Beispiel (PowerShell, lokale Entwicklung):
 
@@ -18,6 +19,20 @@ npm.cmd start
 ```
 
 Sitzungen laufen nach sieben Tagen ab; abgelaufene Einträge werden beim Start und beim Ausstellen neuer Sitzungen entfernt, pro Konto bleiben höchstens zehn aktive Sitzungen.
+
+## Admin-Passwort zurücksetzen
+
+Geht das Admin-Passwort verloren, setzt ein Kommando im Container ein neues, zufälliges Passwort und gibt es aus:
+
+```sh
+docker exec -it <container> npm run reset-admin-password
+```
+
+- Setzt das Passwort für das Admin-Konto und widerruft dessen bisherige Sitzungen.
+- Bei mehreren Admin-Konten einen Namen ergänzen: `npm run reset-admin-password -- <benutzername>`.
+- Funktioniert auch im laufenden Betrieb; die Ausgabe erscheint in der Konsole.
+- Das neue Passwort nur an berechtigte Personen weitergeben.
+
 
 ## Produktiv nur über HTTPS
 
@@ -34,7 +49,7 @@ Für eine feste öffentliche Domain `APP_ORIGIN` vor dem Start auf die HTTPS-Ori
 - Die dokumentierte Startweise setzt einen **Linux-Host mit Host-Netzwerk** voraus: Node bleibt auf `127.0.0.1:1621` erreichbar, und Express vertraut weiterhin nur dem lokalen Proxy. Der Host-Port 1621 liegt oberhalb der privilegierten Ports.
 
 ```sh
-cp .env.example .env   # APP_ORIGIN aktivieren, ADMIN_* bei Neuinstallation ausfüllen
+cp .env.example .env   # APP_ORIGIN aktivieren
 docker compose pull
 docker compose up -d
 docker compose logs -f grillabend

@@ -8,7 +8,7 @@ const { createAuthLimit } = require('./auth-limit');
 const SESSION_AGE = 7 * 24 * 60 * 60 * 1000;
 const PROJECT_DIR = path.resolve(__dirname, '..');
 const PUBLIC_DIR = path.join(PROJECT_DIR, 'public');
-const PUBLIC_FILES = ['css/style.css', 'css/modal.css', 'css/admin.css', 'js/app.js', 'js/admin.js', 'js/admin-exports.js'];
+const PUBLIC_FILES = ['css/style.css', 'css/modal.css', 'css/admin.css', 'js/app.js', 'js/setup.js', 'js/admin.js', 'js/admin-exports.js'];
 
 function validText(value, max = 200) {
     return typeof value === 'string' && value.trim().length <= max;
@@ -50,43 +50,6 @@ async function createApp(options = {}) {
         dataDir: options.dataDir || process.env.DATA_DIR || path.join(PROJECT_DIR, 'data'),
         legacyDir: options.legacyDir || PROJECT_DIR
     });
-    const adminName = process.env.ADMIN_USERNAME;
-    const adminPassword = process.env.ADMIN_PASSWORD;
-    if (Boolean(adminName) !== Boolean(adminPassword)) {
-        await db.close();
-        throw new Error('ADMIN_USERNAME und ADMIN_PASSWORD müssen gemeinsam gesetzt werden.');
-    }
-    if (adminName && adminPassword) {
-        if (!/^[\p{L}\p{N} _.-]{2,40}$/u.test(adminName.trim()) || adminPassword.length < 12) {
-            await db.close();
-            throw new Error('Ungültige Admin-Zugangsdaten: Benutzername 2–40 Zeichen, Passwort mindestens 12 Zeichen.');
-        }
-        const existing = await db.get('SELECT id, is_admin, password_hash FROM users WHERE username = ? COLLATE NOCASE', [adminName.trim()]);
-        if (existing) {
-            if (existing.is_admin !== 1) {
-                await db.close();
-                throw new Error('Der konfigurierte Admin-Name gehört bereits zu einem normalen Konto.');
-            }
-            const samePassword = await verifyPassword(adminPassword, existing.password_hash);
-            if (!samePassword || needsPasswordRehash(existing.password_hash)) {
-                const newHash = await hashPassword(adminPassword);
-                await db.exec('BEGIN IMMEDIATE');
-                try {
-                    await db.run('UPDATE users SET password_hash = ? WHERE id = ?', [newHash, existing.id]);
-                    if (!samePassword) await db.run('DELETE FROM sessions WHERE user_id = ?', [existing.id]);
-                    await db.exec('COMMIT');
-                } catch (error) {
-                    await db.exec('ROLLBACK');
-                    await db.close();
-                    throw error;
-                }
-            }
-        } else {
-            await db.run('INSERT INTO users (username, password_hash, is_admin, show_name) VALUES (?, ?, 1, 1)',
-                [adminName.trim(), await hashPassword(adminPassword)]);
-        }
-    }
-
     const app = express();
     app.disable('x-powered-by');
     if (process.env.NODE_ENV === 'production') {
@@ -132,8 +95,8 @@ async function createApp(options = {}) {
         return /(?:^|;\s*)sid=([a-f0-9]{64})(?:;|$)/.exec(req.get('cookie') || '')?.[1];
     }
 
-    function managedAdmin(user) {
-        return Boolean(adminName && user.is_admin === 1 && user.username.toLowerCase() === adminName.trim().toLowerCase());
+    async function hasAdmin() {
+        return Boolean(await db.get('SELECT 1 FROM users WHERE is_admin = 1 LIMIT 1'));
     }
 
     async function session(req) {
@@ -183,11 +146,30 @@ async function createApp(options = {}) {
         });
         if (!issued) return res.status(401).json({ error: 'Name oder Passwort falsch.' });
         cookie(res, issued.token, SESSION_AGE / 1000);
-        res.json({ username: issued.user.username, is_admin: issued.user.is_admin === 1,
-            show_name: issued.user.show_name === 1, account_managed: managedAdmin(issued.user) });
+        res.json({ username: issued.user.username, is_admin: issued.user.is_admin === 1, show_name: issued.user.show_name === 1 });
     }
 
     const authLimit = createAuthLimit();
+
+    app.post('/api/setup', authLimit, async (req, res, next) => {
+        try {
+            const { username, password } = req.body || {};
+            if (typeof username !== 'string' || !/^[\p{L}\p{N} _.-]{2,40}$/u.test(username.trim()) ||
+                !validNewPassword(password)) {
+                return res.status(400).json({ error: 'Name: 2–40 Zeichen; Passwort: mindestens 12 Zeichen mit Groß- und Kleinbuchstaben, Zahl und Sonderzeichen.' });
+            }
+            const name = username.trim();
+            const passwordHash = await hashPassword(password);
+            // The first admin may only be created while none exists; one write decides atomically.
+            const result = await exclusive(() => db.run(`INSERT INTO users (username, password_hash, is_admin, show_name)
+                SELECT ?, ?, 1, 1 WHERE NOT EXISTS (SELECT 1 FROM users WHERE is_admin = 1)`, [name, passwordHash]));
+            if (!result.changes) return res.status(409).json({ error: 'Es existiert bereits ein Admin-Konto.' });
+            res.json({ success: true, username: name });
+        } catch (error) {
+            if (error.code === 'SQLITE_CONSTRAINT') return res.status(409).json({ error: 'Dieser Name ist bereits vergeben.' });
+            next(error);
+        }
+    });
 
     app.post('/api/register', authLimit, async (req, res, next) => {
         try {
@@ -227,9 +209,8 @@ async function createApp(options = {}) {
     app.get('/api/session', async (req, res, next) => {
         try {
             const user = await session(req);
-            res.json(user ? { username: user.username, is_admin: user.is_admin === 1,
-                show_name: user.show_name === 1, account_managed: managedAdmin(user) }
-                : { username: null, is_admin: false, show_name: false, account_managed: false });
+            res.json(user ? { username: user.username, is_admin: user.is_admin === 1, show_name: user.show_name === 1 }
+                : { username: null, is_admin: false, show_name: false });
         } catch (error) { next(error); }
     });
 
@@ -258,9 +239,6 @@ async function createApp(options = {}) {
         const account = await db.get('SELECT username, password_hash, is_admin FROM users WHERE id = ?', [req.user.id]);
         if (!account || !(await verifyPassword(currentPassword, account.password_hash))) {
             return { status: 422, error: 'Aktuelles Passwort falsch.' };
-        }
-        if (managedAdmin(account)) {
-            return { status: 409, error: 'Dieses Admin-Konto wird über die Serverkonfiguration verwaltet.' };
         }
         return { account };
     }
@@ -476,7 +454,18 @@ async function createApp(options = {}) {
 
     app.use('/api', (req, res) => res.status(404).json({ error: 'Unbekannter Endpunkt.' }));
 
-    app.get('/', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'index.html')));
+    app.get('/', async (req, res, next) => {
+        try {
+            if (!(await hasAdmin())) return res.redirect('/setup');
+            res.sendFile(path.join(PUBLIC_DIR, 'index.html'));
+        } catch (error) { next(error); }
+    });
+    app.get('/setup', async (req, res, next) => {
+        try {
+            if (await hasAdmin()) return res.redirect('/');
+            res.sendFile(path.join(PUBLIC_DIR, 'setup.html'));
+        } catch (error) { next(error); }
+    });
     app.get('/admin', requireUser, requireAdmin, (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'admin.html')));
     for (const file of PUBLIC_FILES) app.get(`/${file}`, (req, res) => res.sendFile(path.join(PUBLIC_DIR, file)));
     for (const file of ['leaflet.js', 'leaflet.css']) {
