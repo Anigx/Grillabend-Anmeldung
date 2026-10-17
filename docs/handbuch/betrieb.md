@@ -58,7 +58,21 @@ Node bindet standardmäßig an `0.0.0.0:PORT` (per `HOST` änderbar) und ist dam
 - **`APP_ORIGIN=https://…` (empfohlen):** Ein lokaler Nginx-Reverse-Proxy übernimmt Zertifikat und TLS. Die App akzeptiert nur Anfragen, bei denen der als `loopback` vertrauenswürdige Proxy `X-Forwarded-Proto: https` setzt; direkte HTTP-Anfragen ohne diesen Nachweis erhalten `426`. Das Session-Cookie ist `Secure`.
 - **`APP_ORIGIN=http://…`:** Direkter HTTP-Betrieb ohne TLS und ohne `Secure`-Cookie. Nur geeignet, wenn die Verbindung anderweitig verschlüsselt ist (z. B. VPN wie NetBird) oder ein vorgelagerter Proxy TLS terminiert. `HOST=127.0.0.1` zusammen mit einem lokalen Proxy entspricht der früheren, strengeren Konfiguration.
 
-`deploy/nginx.conf.example` zeigt die nötige Konfiguration (Weiterleitung von Port 80 auf 443, Zertifikat, Upstream `127.0.0.1:1621`, Setzen von `Host` und Überschreiben von `X-Forwarded-Proto`, Anti-Framing-Header). Vor dem Einsatz Domain und **beide Dateipfade** ersetzen; keine Zertifikate oder privaten Schlüssel ins Repository übernehmen. Die Vorlage ist noch nicht produktiv aktiviert, weil Domain und Pfade noch offen sind.
+`deploy/nginx.conf.example` zeigt die nötige Konfiguration (Weiterleitung von Port 80 auf 443, Zertifikat, Upstream `127.0.0.1:1621`, Setzen von `Host` und Überschreiben von `X-Forwarded-Proto`, Anti-Framing-Header). Vor dem Einsatz Domain und **beide Dateipfade** ersetzen; keine Zertifikate oder privaten Schlüssel ins Repository übernehmen.
+
+### Selbstsigniertes HTTPS zum Testen
+
+Für Tests ohne echtes Zertifikat richtet ein Skript Nginx mit einem selbstsignierten Zertifikat ein:
+
+```sh
+sudo bash deploy/setup-https-selfsigned.sh <host-oder-ip> [weitere-san...]
+```
+
+- Installiert bei Bedarf Nginx und OpenSSL, erzeugt das Zertifikat unter `/etc/nginx/ssl/grillabend/` und konfiguriert Port 443 als Reverse-Proxy auf `127.0.0.1:1621`.
+- Leitet `http://…` (Port 80) und `https://…:8443` auf `https://…` (Port 443) um.
+- Setzt `APP_ORIGIN=https://<host-oder-ip>` sowie `HOST=127.0.0.1` in `.env` und startet Compose neu.
+- Der Browser zeigt eine Zertifikatswarnung; das ist bei einem selbstsignierten Zertifikat erwartet.
+- Für ein echtes Zertifikat später einen Reverse Proxy davor setzen (oder Nginx mit den Zertifikatspfaden aus `deploy/nginx.conf.example` bestücken) und `APP_ORIGIN` auf die öffentliche Domain umstellen.
 
 ## Docker und Compose
 
