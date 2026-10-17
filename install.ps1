@@ -21,7 +21,6 @@ param(
     [switch]$Purge,
     [switch]$Yes,
     [switch]$NoPause,
-    [ValidateSet('local', 'lan')]
     [string]$Bind,
     [string]$InstallDir,
     [string]$OriginalProfile,
@@ -39,6 +38,7 @@ $script:ImageName = 'ghcr.io/anigx/grillabend-anmeldung:latest'
 $script:HostPort = 1621
 $script:RepoUrl = 'https://github.com/Anigx/Grillabend-Anmeldung.git'
 $script:RepoBranch = 'main'
+$script:RawUrl = 'https://raw.githubusercontent.com/Anigx/Grillabend-Anmeldung/main/install.ps1'
 $script:StateDir = Join-Path $env:ProgramData 'Grillabend-Installer'
 $script:StateFile = Join-Path $script:StateDir 'state.json'
 $script:LogDir = Join-Path $script:StateDir 'Logs'
@@ -62,12 +62,16 @@ $script:BindMode = 'local'
 try {
     [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false)
     $OutputEncoding = New-Object System.Text.UTF8Encoding($false)
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 } catch {
 }
 
 function Write-Help {
     Write-Host @'
 Grillabend-Anmeldung - Installer für Windows (Docker Desktop)
+
+Schnellstart (PowerShell):
+  irm https://raw.githubusercontent.com/Anigx/Grillabend-Anmeldung/main/install.ps1 | iex
 
 Aufruf:
   .\install.ps1                       Interaktive TUI (Installieren/Aktualisieren/Entfernen)
@@ -106,28 +110,57 @@ $script:RequestedInstallDir = $InstallDir
 $script:OriginalProfile = $OriginalProfile
 $script:OriginalUser = $OriginalUser
 
+if ($script:RequestedBind) {
+    $script:RequestedBind = $script:RequestedBind.ToLowerInvariant()
+    if ($script:RequestedBind -notin @('local', 'lan')) {
+        Write-Host "Ungültiger Wert für -Bind: $Bind (erlaubt: local, lan)" -ForegroundColor Red
+        exit 2
+    }
+}
+
 function Test-Admin {
     $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
     $principal = New-Object Security.Principal.WindowsPrincipal($identity)
     return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 }
 
-if (-not (Test-Admin)) {
-    $scriptPath = $PSCommandPath
-    if (-not $scriptPath) {
-        Write-Host 'Bitte den Installer als Datei starten, nicht per Pipe an iex.' -ForegroundColor Red
-        Write-Host 'Empfohlen ist der Einzeiler aus der README (Download nach %PUBLIC%).'
+$scriptPath = $PSCommandPath
+$profilePath = if ($script:OriginalProfile) { $script:OriginalProfile } else { $env:USERPROFILE }
+$userName = if ($script:OriginalUser) { $script:OriginalUser } else { "$env:USERDOMAIN\$env:USERNAME" }
+$pipedMode = -not $scriptPath
+
+if ($pipedMode) {
+    $bootstrapDir = if ($env:PUBLIC) { Join-Path $env:PUBLIC 'Grillabend-Installer' } else { Join-Path $env:TEMP 'Grillabend-Installer' }
+    try {
+        New-Item -ItemType Directory -Force -Path $bootstrapDir -ErrorAction Stop | Out-Null
+        $scriptPath = Join-Path $bootstrapDir 'install.ps1'
+        Write-Host 'Installer wird geladen ...' -ForegroundColor Cyan
+        Invoke-RestMethod -Uri $script:RawUrl -OutFile $scriptPath -ErrorAction Stop
+    } catch {
+        Write-Host "Der Installer konnte nicht geladen werden: $($_.Exception.Message)" -ForegroundColor Red
         exit 1
     }
-    $profilePath = if ($script:OriginalProfile) { $script:OriginalProfile } else { $env:USERPROFILE }
-    $userName = if ($script:OriginalUser) { $script:OriginalUser } else { "$env:USERDOMAIN\$env:USERNAME" }
-    $argString = "-NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`" -OriginalProfile `"$profilePath`" -OriginalUser `"$userName`""
-    if ($script:RequestedBind) { $argString += " -Bind $($script:RequestedBind)" }
-    if ($script:RequestedInstallDir) { $argString += " -InstallDir `"$($script:RequestedInstallDir)`"" }
-    if ($Uninstall) { $argString += ' -Uninstall' }
-    if ($Purge) { $argString += ' -Purge' }
-    if ($Yes) { $argString += ' -Yes' }
-    if ($NoPause) { $argString += ' -NoPause' }
+}
+
+$argString = "-NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`" -OriginalProfile `"$profilePath`" -OriginalUser `"$userName`""
+if ($script:RequestedBind) { $argString += " -Bind $($script:RequestedBind)" }
+if ($script:RequestedInstallDir) { $argString += " -InstallDir `"$($script:RequestedInstallDir)`"" }
+if ($Uninstall) { $argString += ' -Uninstall' }
+if ($Purge) { $argString += ' -Purge' }
+if ($Yes) { $argString += ' -Yes' }
+if ($NoPause) { $argString += ' -NoPause' }
+
+if ($pipedMode -and (Test-Admin)) {
+    try {
+        Start-Process -FilePath 'powershell.exe' -ArgumentList $argString -NoNewWindow -Wait -ErrorAction Stop | Out-Null
+    } catch {
+        Write-Host "Der Installer konnte nicht gestartet werden: $($_.Exception.Message)" -ForegroundColor Red
+        exit 1
+    }
+    exit 0
+}
+
+if (-not (Test-Admin)) {
     try {
         Start-Process -FilePath 'powershell.exe' -Verb RunAs -ArgumentList $argString | Out-Null
     } catch {

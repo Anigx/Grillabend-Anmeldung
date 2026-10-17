@@ -27,14 +27,11 @@ bash /tmp/grillabend-install.sh
 ### Windows (Docker Desktop, ohne WSL-Distribution)
 
 ```powershell
-[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12
-$d="$env:PUBLIC\Grillabend-Installer"
-New-Item -ItemType Directory -Force -Path $d | Out-Null
-Invoke-RestMethod https://raw.githubusercontent.com/Anigx/Grillabend-Anmeldung/main/install.ps1 -OutFile "$d\install.ps1"
-powershell -NoProfile -ExecutionPolicy Bypass -File "$d\install.ps1"
+irm https://raw.githubusercontent.com/Anigx/Grillabend-Anmeldung/main/install.ps1 | iex
 ```
 
-- Unterstützt Windows 11 sowie Windows 10 22H2 mit Warnung; nur x64. Die TUI benötigt eine normale PowerShell-Konsole (nicht ISE) und startet sich per UAC in einem neuen Fenster. Docker Desktop wird bei Bedarf per `winget` installiert. WSL2 wird **nur als von Docker Desktop benötigtes Backend** aktiviert; es wird keine Ubuntu-Distribution eingerichtet. Git wird bei Bedarf per `winget` installiert.
+- Der Einzeiler lädt den Installer aus dem `main`-Branch, legt ihn unter `%PUBLIC%\Grillabend-Installer\install.ps1` ab und startet die TUI; bei fehlenden Adminrechten wird er per UAC erhöht. Nur ausführen, wenn du dem Repository vertraust. Die heruntergeladene Datei bleibt für spätere Aufrufe mit Optionen (z. B. `-Uninstall`) liegen.
+- Unterstützt Windows 11 sowie Windows 10 22H2 mit Warnung; nur x64. Die TUI benötigt eine normale PowerShell-Konsole (nicht ISE); bei fehlenden Adminrechten öffnet sich ein erhöhtes Fenster. Docker Desktop wird bei Bedarf per `winget` installiert. WSL2 wird **nur als von Docker Desktop benötigtes Backend** aktiviert; es wird keine Ubuntu-Distribution eingerichtet. Git wird bei Bedarf per `winget` installiert.
 - Standardziel ist `%USERPROFILE%\Grillabend-Anmeldung`, der Pfad wird abgefragt. Status und Logs: `%ProgramData%\Grillabend-Installer`.
 - **Bindung:** Standard ist die LAN-Freigabe (`0.0.0.0:1621`) nach ausdrücklicher Bestätigung. Der Installer legt eine Windows-Firewall-Regel für TCP 1621 in privaten/Domänen-Netzen und dem lokalen Subnetz an. „Nur lokal“ (`127.0.0.1:1621`) ist ebenfalls wählbar. Die App spricht nur HTTP; im LAN sind Zugangsdaten unverschlüsselt.
 - Docker Desktop wird beim Anmelden über eine Aufgabe gestartet, damit der Container mit `restart: unless-stopped` wieder hochkommt. Die Aufgabe und die Firewall-Regel werden nur von der App angelegt und bei der Deinstallation entfernt; Docker Desktop, WSL2 und Git bleiben installiert.
