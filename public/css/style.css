@@ -963,3 +963,179 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
         transition: none;
     }
 }
+
+@media (min-width: 768px) {
+    body {
+        align-items: flex-start;
+    }
+
+    h1 {
+        font-size: 2.5rem;
+    }
+
+    .section-title,
+    .form-title {
+        font-size: 1.5rem;
+    }
+
+    #rsvpContainer > .page-intro {
+        text-align: left;
+    }
+
+    #rsvpContainer > .page-intro p {
+        margin-inline: 0;
+    }
+
+    #rsvpContainer .map-frame {
+        height: 300px;
+    }
+}
+
+@media (min-width: 768px) and (max-width: 899px) {
+    #rsvpContainer {
+        width: 100%;
+        max-width: 760px;
+        padding: 2rem;
+    }
+
+    #rsvpContainer .stats {
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+    }
+
+    #rsvpContainer .stat-box {
+        padding: 0.9rem 0.4rem;
+    }
+
+    #rsvpContainer .stat-box span {
+        font-size: 1.25rem;
+    }
+}
+
+@media (min-width: 900px) {
+    #rsvpContainer {
+        display: grid;
+        grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+        grid-template-areas:
+            "head head"
+            "info list"
+            "rsvp list";
+        gap: 1.5rem;
+        align-items: start;
+        width: 100%;
+        max-width: 1100px;
+        align-self: flex-start;
+        padding: 2.5rem;
+    }
+
+    #rsvpContainer > .page-intro {
+        grid-area: head;
+        margin-bottom: 0;
+    }
+
+    #rsvpContainer > .party-info-card {
+        grid-area: info;
+        margin-bottom: 0;
+    }
+
+    #rsvpContainer > .rsvp-form {
+        grid-area: rsvp;
+    }
+
+    #rsvpContainer > .attendee-list-section {
+        grid-area: list;
+        align-self: start;
+        min-width: 0;
+        margin-top: 0;
+        padding: 1.5rem;
+        border: 1px solid var(--glass-border);
+        border-radius: 16px;
+        background: rgba(30, 30, 46, 0.4);
+    }
+
+    #rsvpContainer .attendee-list {
+        max-height: clamp(240px, calc(100dvh - 360px), 600px);
+    }
+}
+
+@media (min-width: 900px) and (max-width: 1199px) {
+    #rsvpContainer .stats {
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+    }
+
+    #rsvpContainer .stat-box {
+        grid-column: span 2;
+        font-size: 0.75rem;
+    }
+
+    #rsvpContainer .stat-box:nth-child(4),
+    #rsvpContainer .stat-box:nth-child(5) {
+        grid-column: span 3;
+    }
+
+    #rsvpContainer .form-actions {
+        gap: 0.75rem;
+    }
+
+    #rsvpContainer .form-actions .submit-btn {
+        font-size: 0.9rem;
+    }
+
+    #rsvpContainer .delete-btn {
+        flex: 0 0 auto;
+        padding-inline: 0.6rem;
+        font-size: 0.85rem;
+        white-space: nowrap;
+    }
+}
+
+@media (min-width: 1200px) {
+    #rsvpContainer .stats {
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+    }
+
+    #rsvpContainer .stat-box {
+        padding: 0.9rem 0.4rem;
+    }
+
+    #rsvpContainer .stat-box span {
+        font-size: 1.25rem;
+    }
+}
+
+@media (min-width: 900px) {
+    .auth-container {
+        display: grid;
+        grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+        column-gap: 2.5rem;
+        align-items: start;
+        width: 100%;
+        max-width: 900px;
+        align-self: flex-start;
+        padding: 2.5rem;
+    }
+
+    .auth-container > .auth-intro {
+        grid-column: 1;
+        grid-row: 1 / span 2;
+        align-self: stretch;
+        margin-bottom: 0;
+        padding-right: 1.5rem;
+        border-right: 1px solid var(--glass-border);
+        text-align: left;
+    }
+
+    .auth-container > .auth-intro p {
+        margin-inline: 0;
+    }
+
+    .auth-container > .auth-mode {
+        grid-column: 2;
+        grid-row: 1;
+        margin-bottom: 1.5rem;
+    }
+
+    .auth-container > form {
+        grid-column: 2;
+        grid-row: auto;
+    }
+}

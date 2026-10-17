@@ -1,5 +1,5 @@
 .admin-shell {
-    max-width: 1080px;
+    max-width: 1100px;
     overflow: hidden;
     margin: auto;
 }
@@ -160,4 +160,8 @@
     .admin-reset-action { width: 100%; }
     .reset-dialog { width: calc(100% - 1.5rem); max-height: calc(100dvh - 1.5rem); padding: 1.25rem; }
     .admin-export-status { right: max(0.75rem, env(safe-area-inset-right)); bottom: max(0.75rem, env(safe-area-inset-bottom)); }
+}
+
+@media (min-width: 900px) {
+    .admin-two-columns { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
