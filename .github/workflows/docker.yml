@@ -20,8 +20,12 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - run: npm ci
+      - run: npm ci --ignore-scripts
+      - name: Nginx für lokalen Proxy-Regressionstest installieren
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq nginx
       - run: npm test
+        env:
+          RUN_NGINX_TESTS: "1"
 
   build:
     needs: test

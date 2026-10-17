@@ -11,13 +11,15 @@
   "author": "",
   "license": "ISC",
   "type": "commonjs",
+  "engines": {
+    "node": ">=22.13.0"
+  },
   "dependencies": {
     "exceljs": "^4.4.0",
     "express": "^5.2.1",
     "jszip": "^3.10.2",
     "leaflet": "^1.9.4",
-    "pdf-lib": "^1.17.1",
-    "sqlite3": "^6.0.1"
+    "pdfmake": "^0.3.11"
   },
   "overrides": {
     "exceljs": {

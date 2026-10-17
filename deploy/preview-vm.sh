@@ -56,7 +56,7 @@ case "${1:-}" in
     ready=''
     for attempt in $(seq 1 10); do
       if curl --fail --silent --show-error --max-time 10 \
-        --header "Host: $host" http://127.0.0.1:8080/ --output /dev/null; then
+        --header "Host: $host" --header 'CF-Connecting-IP: 203.0.113.10' http://127.0.0.1:8080/ --output /dev/null; then
         ready=1
         break
       fi
@@ -76,6 +76,7 @@ case "${1:-}" in
       exit 1
     fi
     [[ "$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:1621/api/session)" == 426 ]]
+    [[ "$(curl --silent --output /dev/null --write-out '%{http_code}' --header "Host: $host" http://127.0.0.1:8080/api/session)" == 403 ]]
 
     for attempt in $(seq 1 30); do
       if curl --fail --silent --show-error --max-time 15 "$url/" \
