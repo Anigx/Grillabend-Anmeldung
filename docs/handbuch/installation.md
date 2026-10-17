@@ -2,10 +2,26 @@
 
 ## Voraussetzungen
 
-- **Node.js ab 22.13.** Die Anwendung nutzt das in Node integrierte `node:sqlite`; ein separates natives SQLite-Paket wird nicht benötigt.
+- **Docker (empfohlen):** Docker mit Compose auf einem Linux-Host mit Host-Netzwerk; die öffentliche TLS-Verbindung endet an einem lokalen Nginx-Reverse-Proxy (siehe [Betrieb](betrieb.md)).
+- **Ohne Docker (Alternative):** Node.js ab 22.13. Die Anwendung nutzt das in Node integrierte `node:sqlite`; ein separates natives SQLite-Paket wird nicht benötigt.
 - Internetzugang für die Karten- und Exporter-Funktionen ist nur im Browser nötig (OpenStreetMap/Nominatim bzw. Google Maps), nicht für den Serverstart.
 
-## Lokal starten
+## Installation mit Docker (empfohlen)
+
+Im Projektordner:
+
+```sh
+cp .env.example .env   # APP_ORIGIN auf die tatsächliche HTTPS-Origin setzen
+docker compose pull
+docker compose up -d
+docker compose logs -f grillabend
+```
+
+- Compose verwendet das veröffentlichte Image `ghcr.io/anigx/cloud-erazy-project:latest`, das feste Volume `grillabend-data` und `NODE_ENV=production`. Im Produktionsmodus lauscht Node nur auf `127.0.0.1:1621`; die öffentliche HTTPS-Verbindung übernimmt ein lokaler Nginx-Reverse-Proxy, der wie der Container im Host-Netzwerk läuft.
+- `APP_ORIGIN` ist die einzige erlaubte Origin für Schreibanfragen (HTTPS, ohne Pfad oder abschließenden `/`) und muss dem Host entsprechen, den Nginx an Node weiterleitet.
+- Einzelheiten, die Nginx-Vorlage, `GRILLABEND_IMAGE` und das Backup des Volumes stehen unter [Betrieb](betrieb.md).
+
+## Alternative: lokal mit Node
 
 Im Projektordner:
 
@@ -33,7 +49,7 @@ npm test
 
 Ein Admin-Konto wird beim ersten Start **in der Oberfläche** angelegt, nicht über Umgebungsvariablen:
 
-1. `npm start` ausführen und <http://127.0.0.1:621> öffnen.
+1. Die Anwendung starten (per Docker oder lokal) und die Seite im Browser öffnen – bei Docker über die öffentliche HTTPS-Adresse, lokal <http://127.0.0.1:621>.
 2. Solange kein Admin existiert, leitet die Startseite automatisch auf `/setup` um. Dort Benutzername (2–40 Zeichen) und Passwort (mindestens zwölf Zeichen mit Groß- und Kleinbuchstaben, Zahl und Sonderzeichen) eingeben.
 3. Nach dem Anlegen zur Anmeldung zurückkehren und mit dem neuen Konto anmelden.
 
@@ -46,7 +62,7 @@ Geht das Admin-Passwort verloren, lässt es sich im Container mit `npm run reset
 
 ## Erster Start und Datenbestand
 
-- Beim ersten Start legt die Anwendung `data/app.sqlite` an.
+- Beim ersten Start legt die Anwendung die SQLite-Datei an: `data/app.sqlite` (im Container im Volume `grillabend-data`).
 - Liegen im Projektordner die drei historischen SQLite-Dateien `accounts.sqlite`, `party_eintraege.sqlite` und `Datum.sqlite`, werden Konten, Zusagen und Veranstaltungsdaten einmalig **nur lesend** importiert; alte Klartextpasswörter werden dabei gehasht. Ein Kennzeichen verhindert einen erneuten Import. Im aktuellen lokalen Projekt wurden diese Altdateien nach Abgleich entfernt.
 - **Für einen Umzug oder eine Wiederherstellung mit vorhandenen Konten und Zusagen muss `data/app.sqlite` separat gesichert und übertragen werden.** Ohne diese Datei (und ohne Altdateien) startet die Anwendung mit einer neuen, leeren Datenbank.
 

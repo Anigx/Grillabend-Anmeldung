@@ -25,4 +25,5 @@
 
 ## Technische Mindestanforderung
 
-- **Node.js ab 22.13** wird vorausgesetzt – ältere Versionen laden die Anwendung nicht.
+- **Empfohlen wird der Betrieb per Docker/Compose** auf einem Linux-Host mit Host-Netzwerk und lokalem Nginx-Reverse-Proxy.
+- **Für den lokalen Betrieb ohne Docker:** Node.js ab 22.13 – ältere Versionen laden die Anwendung nicht.
