@@ -39,6 +39,20 @@ npm.cmd ci --ignore-scripts
 npm.cmd start
 ```
 
+### Windows mit Docker Desktop
+
+`network_mode: host` funktioniert unter Docker Desktop nicht, weil es sich nur auf die Linux-VM bezieht. Dafür gibt es `compose.windows.yaml` mit Portmapping:
+
+```powershell
+Copy-Item .env.windows.example .env.windows
+docker compose --env-file .env.windows -f compose.windows.yaml pull
+docker compose --env-file .env.windows -f compose.windows.yaml up -d
+```
+
+- `APP_ORIGIN` steht in `.env.windows` (Standard `http://127.0.0.1:621`); für LAN-Zugriff dort die LAN-IP ergänzen und das Portmapping in `compose.windows.yaml` auf `"621:621"` ändern.
+- Im Container ist `HOST=0.0.0.0` fest gesetzt, damit das Portmapping greift.
+- Nginx/HTTPS entfällt lokal; für Produktion den Linux-Weg mit `deploy/setup-https-selfsigned.sh` verwenden.
+
 Tests ausführen (verwenden ausschließlich temporäre, künstliche Datenbanken):
 
 ```sh
