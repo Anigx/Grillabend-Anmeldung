@@ -40,14 +40,27 @@ function parseOrigin(value) {
     }
 }
 
+function parseOrigins(value) {
+    if (typeof value !== 'string') return null;
+    const parts = value.split(',').map(part => part.trim()).filter(Boolean);
+    if (parts.length === 0) return null;
+    const origins = [];
+    for (const part of parts) {
+        const origin = parseOrigin(part);
+        if (!origin || origins.includes(origin)) return null;
+        origins.push(origin);
+    }
+    return origins;
+}
+
 async function createApp(options = {}) {
     const originSetting = options.origin ?? process.env.APP_ORIGIN;
-    const allowedOrigin = originSetting === undefined ? null : parseOrigin(originSetting);
-    if (originSetting !== undefined && !allowedOrigin) {
-        throw new Error('APP_ORIGIN muss eine gültige Origin sein (Schema, Host, optional Port; ohne Pfad oder Zugangsdaten).');
+    const allowedOrigins = originSetting === undefined ? null : parseOrigins(originSetting);
+    if (originSetting !== undefined && !allowedOrigins) {
+        throw new Error('APP_ORIGIN muss eine oder mehrere gültige Origins enthalten (kommasepariert; Schema, Host, optional Port; ohne Pfad oder Zugangsdaten).');
     }
     const requireHttps = process.env.NODE_ENV === 'production' &&
-        (allowedOrigin ? allowedOrigin.startsWith('https://') : true);
+        (allowedOrigins ? allowedOrigins.every(origin => origin.startsWith('https://')) : true);
     const db = await openDatabase({
         dataDir: options.dataDir || process.env.DATA_DIR || path.join(PROJECT_DIR, 'data'),
         legacyDir: options.legacyDir || PROJECT_DIR
@@ -81,7 +94,7 @@ async function createApp(options = {}) {
             } catch { /* Ein fehlerhafter Host wird abgelehnt. */ }
         }
         // Same-origin browser writes carry Origin; reject missing, malformed, cross-scheme or cross-site writes.
-        if (!requestOrigin || (allowedOrigin && requestOrigin !== allowedOrigin) || parseOrigin(origin) !== requestOrigin ||
+        if (!requestOrigin || (allowedOrigins && !allowedOrigins.includes(requestOrigin)) || parseOrigin(origin) !== requestOrigin ||
             (site && !['same-origin', 'none'].includes(site))) {
             return res.status(403).json({ error: 'Ungültiger Anfrageursprung.' });
         }

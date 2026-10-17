@@ -23,6 +23,7 @@ KEY="$CERT_DIR/selfsigned.key"
 
 SANS=""
 SERVER_NAMES="$PRIMARY"
+ORIGINS="https://$PRIMARY"
 add_san() {
     if [[ "$1" =~ ^[0-9.]+$ ]]; then
         SANS="${SANS},IP:$1"
@@ -35,6 +36,7 @@ add_san "$PRIMARY"
 for name in "$@"; do
     add_san "$name"
     SERVER_NAMES="$SERVER_NAMES $name"
+    ORIGINS="$ORIGINS,https://$name"
 done
 add_san 127.0.0.1
 add_san localhost
@@ -100,9 +102,9 @@ systemctl reload nginx
 ENV_FILE="$PROJECT_DIR/.env"
 if [[ -f "$ENV_FILE" ]]; then
     if grep -q '^APP_ORIGIN=' "$ENV_FILE"; then
-        sed -i "s|^APP_ORIGIN=.*|APP_ORIGIN=https://$PRIMARY|" "$ENV_FILE"
+        sed -i "s|^APP_ORIGIN=.*|APP_ORIGIN=$ORIGINS|" "$ENV_FILE"
     else
-        printf '\nAPP_ORIGIN=https://%s\n' "$PRIMARY" >> "$ENV_FILE"
+        printf '\nAPP_ORIGIN=%s\n' "$ORIGINS" >> "$ENV_FILE"
     fi
     if grep -q '^HOST=' "$ENV_FILE"; then
         sed -i 's|^HOST=.*|HOST=127.0.0.1|' "$ENV_FILE"
@@ -111,7 +113,7 @@ if [[ -f "$ENV_FILE" ]]; then
     fi
     (cd "$PROJECT_DIR" && docker compose up -d)
 else
-    echo "Hinweis: $ENV_FILE fehlt. APP_ORIGIN=https://$PRIMARY und HOST=127.0.0.1 setzen und Compose starten."
+    echo "Hinweis: $ENV_FILE fehlt. APP_ORIGIN=$ORIGINS und HOST=127.0.0.1 setzen und Compose starten."
 fi
 
 echo

@@ -7,7 +7,7 @@
 | `PORT` | `621` | HTTP-Port des Servers. |
 | `HOST` | `0.0.0.0` | Netzwerkbindung des Servers. `127.0.0.1` beschränkt den Zugriff auf den lokalen Rechner bzw. einen lokalen Proxy. |
 | `DATA_DIR` | `data/` (im Projektordner) | Ordner der SQLite-Datenbank. |
-| `APP_ORIGIN` | – | Einzige zulässige öffentliche Origin für Schreibanfragen (Schema, Host, optional Port) – **ohne** abschließenden Slash oder Pfad. Mit `https://` erzwingt der Produktionsmodus HTTPS und `Secure`-Cookies; mit `http://` ist direkter HTTP-Betrieb erlaubt (nur in einem vertrauenswürdigen, verschlüsselten Netz wie VPN oder hinter einem TLS-Proxy). Ohne die Variable wird die Origin aus Anfrageprotokoll und Host abgeleitet. |
+| `APP_ORIGIN` | – | Zulässige öffentliche Origins für Schreibanfragen (Schema, Host, optional Port) – **ohne** abschließenden Slash oder Pfad; mehrere kommasepariert. Mit `https://` erzwingt der Produktionsmodus HTTPS und `Secure`-Cookies; mit `http://` ist direkter HTTP-Betrieb erlaubt (nur in einem vertrauenswürdigen, verschlüsselten Netz wie VPN oder hinter einem TLS-Proxy). Ohne die Variable wird die Origin aus Anfrageprotokoll und Host abgeleitet. |
 | `NODE_ENV` | – | `production` setzt bei HTTPS-Origin das Session-Cookie auf `Secure` und verlangt bestätigtes HTTPS. |
 
 Ein Admin-Konto wird nicht mehr über Umgebungsvariablen angelegt, sondern beim ersten Aufruf über die Ersteinrichtung (`/setup`, siehe [Installation](installation.md)).
@@ -70,7 +70,7 @@ sudo bash deploy/setup-https-selfsigned.sh <host-oder-ip> [weitere-san...]
 
 - Installiert bei Bedarf Nginx und OpenSSL, erzeugt das Zertifikat unter `/etc/nginx/ssl/grillabend/` und konfiguriert Port 443 als Reverse-Proxy auf `127.0.0.1:1621`.
 - Leitet `http://…` (Port 80) und `https://…:8443` auf `https://…` (Port 443) um.
-- Setzt `APP_ORIGIN=https://<host-oder-ip>` sowie `HOST=127.0.0.1` in `.env` und startet Compose neu.
+- Setzt `APP_ORIGIN` auf alle übergebenen Hosts/IPs (kommasepariert) sowie `HOST=127.0.0.1` in `.env` und startet Compose neu.
 - Der Browser zeigt eine Zertifikatswarnung; das ist bei einem selbstsignierten Zertifikat erwartet.
 - Für ein echtes Zertifikat später einen Reverse Proxy davor setzen (oder Nginx mit den Zertifikatspfaden aus `deploy/nginx.conf.example` bestücken) und `APP_ORIGIN` auf die öffentliche Domain umstellen.
 

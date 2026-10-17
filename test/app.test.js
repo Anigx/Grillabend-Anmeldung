@@ -585,8 +585,8 @@ test('fremde und fehlerhafte Origins werden bei schreibenden Anfragen verworfen'
 });
 
 test('APP_ORIGIN bindet Schreibanfragen an die konfigurierte HTTPS-/Host-/Port-Kombination', async () => {
-    const body = JSON.stringify({ username: 'Lina', password: 'ein-lang-genuges-Testpasswort1' });
-    const request = (base, host, origin, forwardedProto) => new Promise((resolve, reject) => {
+    const request = (base, host, origin, forwardedProto, username = 'Lina') => new Promise((resolve, reject) => {
+        const body = JSON.stringify({ username, password: 'ein-lang-genuges-Testpasswort1' });
         const headers = { Host: host, Origin: origin, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) };
         if (forwardedProto) headers['X-Forwarded-Proto'] = forwardedProto;
         const outgoing = http.request(`${base}/api/register`, { method: 'POST', headers }, response => {
@@ -610,7 +610,18 @@ test('APP_ORIGIN bindet Schreibanfragen an die konfigurierte HTTPS-/Host-/Port-K
         assert.equal((await app.db.get('SELECT COUNT(*) AS count FROM users')).count, 0);
         assert.equal(await request(app.base, 'veranstaltung.example:8080', 'http://veranstaltung.example:8080'), 200);
     } finally { await app.close(); }
-    for (const origin of ['null', 'https://example.test/path', 'https://user@example.test', 'ftp://example.test', 'https://example.test/']) {
+    process.env.APP_ORIGIN = 'http://a.example, http://b.example';
+    let multiApp;
+    try { multiApp = await instance(); }
+    finally {
+        if (previousOrigin === undefined) delete process.env.APP_ORIGIN; else process.env.APP_ORIGIN = previousOrigin;
+    }
+    try {
+        assert.equal(await request(multiApp.base, 'a.example', 'http://a.example', null, 'LinaA'), 200);
+        assert.equal(await request(multiApp.base, 'b.example', 'http://b.example', null, 'LinaB'), 200);
+        assert.equal(await request(multiApp.base, 'c.example', 'http://c.example', null, 'LinaC'), 403);
+    } finally { await multiApp.close(); }
+    for (const origin of ['null', 'https://example.test/path', 'https://user@example.test', 'ftp://example.test', 'https://example.test/', 'http://a.example,kein-url', 'http://a.example,http://a.example']) {
         await assert.rejects(createApp({ dataDir: app.root, legacyDir: app.root, origin }), /APP_ORIGIN/);
     }
     const original = process.env.NODE_ENV;
