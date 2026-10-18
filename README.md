@@ -29,10 +29,10 @@ curl -fsSL https://raw.githubusercontent.com/Anigx/Grillabend-Anmeldung/main/ins
 
 Ohne `curl` alternativ `wget -qO /tmp/grillabend-install.sh <URL> && bash /tmp/grillabend-install.sh`. Standardziel ist `/opt/grillabend`; die Bindung ist standardmäßig nur lokal (`127.0.0.1:1621`) für einen späteren Reverse Proxy. LAN-Freigabe ist mit Sicherheitswarnung wählbar.
 
-**Windows** (PowerShell, lädt sich bei Bedarf nach `%PUBLIC%\Grillabend-Installer` und startet sich bei fehlenden Adminrechten per UAC neu):
+**Windows** (PowerShell; der Bootstrap lädt den Installer nach `%PUBLIC%\Grillabend-Installer` und startet ihn bei fehlenden Adminrechten per UAC neu):
 
 ```powershell
-irm https://raw.githubusercontent.com/Anigx/Grillabend-Anmeldung/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/Anigx/Grillabend-Anmeldung/main/bootstrap.ps1 | iex
 ```
 
 Der Windows-Installer richtet Docker Desktop per `winget` ein und aktiviert WSL2 ausschließlich als Docker-Backend (keine Ubuntu-Distribution). Standard ist die LAN-Freigabe auf `0.0.0.0:1621` mit Bestätigung und einer Firewall-Regel für private/Domänen-Netze; „nur lokal“ ist ebenfalls wählbar. Docker Desktop, WSL2 und Git werden bei einer Deinstallation nicht entfernt.
@@ -54,7 +54,7 @@ Status und Logs liegen unter `/var/lib/grillabend-installer` bzw. `/var/log/gril
 
 ## Projektstruktur
 
-- `install.sh`, `install.ps1` – interaktive Installer für Linux bzw. Windows.
+- `install.sh`, `install.ps1`, `bootstrap.ps1` – interaktive Installer für Linux bzw. Windows sowie der kurze Windows-Einzeiler-Bootstrap.
 - `server.js` – kleiner Startpunkt; `src/server.js` – HTTP-Routen, Sitzungen und Kapazitätslogik.
 - `src/db.js`, `src/security.js`, `src/auth-limit.js` – SQLite-Initialisierung/Alt-Import, Passwort-/Token-Funktionen und Auth-Limits; `src/reset-password.js` – CLI zum Zurücksetzen des Admin-Passworts; `src/seed-demo-users.js` – CLI für Showcase-Daten.
 - `public/` – `index.html`/`js/app.js` (Anmeldung und Teilnahme), `setup.html`/`js/setup.js` (Ersteinrichtung), `admin.html`/`js/admin.js` (Adminoberfläche), `css/`.

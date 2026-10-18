@@ -21,7 +21,7 @@ Sitzungen laufen nach sieben Tagen ab; abgelaufene Einträge werden beim Start u
 
 ## Automatischer Installer
 
-`install.sh` (Debian/Ubuntu) und `install.ps1` (Windows/Docker Desktop) sind interaktive Fullscreen-Installer. Sie prüfen bzw. installieren Docker, klonen das Projekt, ziehen das GHCR-Image, richten das Volume ein, bieten den Import einer vorhandenen `data/app.sqlite` an und unterstützen Update, Backup, Deinstallation und Autostart.
+`install.sh` (Debian/Ubuntu) und `install.ps1` (Windows/Docker Desktop) sind interaktive Fullscreen-Installer; unter Windows startet der kurze Einzeiler über `bootstrap.ps1`. Sie prüfen bzw. installieren Docker, klonen das Projekt, ziehen das GHCR-Image, richten das Volume ein, bieten den Import einer vorhandenen `data/app.sqlite` an und unterstützen Update, Backup, Deinstallation und Autostart.
 
 | Betriebssystem | Status/Logs | Entfernen |
 | --- | --- | --- |

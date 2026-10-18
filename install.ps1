@@ -71,7 +71,7 @@ function Write-Help {
 Grillabend-Anmeldung - Installer für Windows (Docker Desktop)
 
 Schnellstart (PowerShell):
-  irm https://raw.githubusercontent.com/Anigx/Grillabend-Anmeldung/main/install.ps1 | iex
+  irm https://raw.githubusercontent.com/Anigx/Grillabend-Anmeldung/main/bootstrap.ps1 | iex
 
 Aufruf:
   .\install.ps1                       Interaktive TUI (Installieren/Aktualisieren/Entfernen)
