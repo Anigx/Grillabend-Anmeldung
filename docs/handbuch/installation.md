@@ -23,7 +23,7 @@ bash /tmp/grillabend-install.sh
 - Das Image wird als `ghcr.io/anigx/grillabend-anmeldung:latest` gezogen. Es gibt nur `linux/amd64`; ARM-Systeme (z. B. Raspberry Pi) werden abgelehnt.
 - Ein Update sichert die SQLite-Datenbank vorher automatisch (die letzten fünf Backups bleiben unter `backups/`). `--uninstall` entfernt Container und Image, behält Projektordner, Volume und Backups. `--purge` entfernt zusätzlich Volume, Projektordner und Backups.
 - Ein lokaler Reverse Proxy kann anschließend auf `127.0.0.1:1621` zeigen. Das Skript installiert bewusst **kein** Nginx und kein Zertifikat; dafür gelten die Hinweise unter [Betrieb](betrieb.md).
-- Weitere Optionen: `bash install.sh --help` (u. a. `--install-dir`, `--bind local|lan`, `--yes`, `--no-color`). Die TUI führt durch die normalen Fragen.
+- Weitere Optionen: `bash install.sh --help` (u. a. `--install-dir PFAD` oder `--install-dir=PFAD`, `--bind local|lan` oder `--bind=local`, `--yes`, `--no-color`). Die TUI führt durch die normalen Fragen.
 
 ### Windows (Docker Desktop, ohne WSL-Distribution)
 

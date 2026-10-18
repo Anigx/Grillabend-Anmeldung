@@ -80,29 +80,45 @@ Logs:   /var/log/grillabend-installer/
 EOF
 }
 
-for arg in "$@"; do
-    case "$arg" in
+ORIGINAL_ARGS=("$@")
+while [[ $# -gt 0 ]]; do
+    case "$1" in
         --help|-h) usage; exit 0 ;;
         --version) printf '%s\n' "$INSTALLER_VERSION"; exit 0 ;;
-        --uninstall) MODE="uninstall" ;;
-        --purge) MODE="purge" ;;
-        --yes|-y) ASSUME_YES="1" ;;
-        --no-color) USE_COLOR="0" ;;
-        --install-dir=*) INSTALL_DIR_ARG="${arg#*=}" ;;
-        --bind=*)
-            BIND_ARG="${arg#*=}"
-            if [[ "$BIND_ARG" != "local" && "$BIND_ARG" != "lan" ]]; then
-                printf 'Ungültiger Wert für --bind: %s\n' "$BIND_ARG" >&2
+        --uninstall) MODE="uninstall"; shift ;;
+        --purge) MODE="purge"; shift ;;
+        --yes|-y) ASSUME_YES="1"; shift ;;
+        --no-color) USE_COLOR="0"; shift ;;
+        --install-dir)
+            if [[ $# -lt 2 || -z "$2" || "$2" == -* ]]; then
+                printf 'Fehlender Wert für --install-dir.\n' >&2
                 exit 2
             fi
+            INSTALL_DIR_ARG="$2"
+            shift 2
             ;;
+        --install-dir=*) INSTALL_DIR_ARG="${1#*=}"; shift ;;
+        --bind)
+            if [[ $# -lt 2 || -z "$2" || "$2" == -* ]]; then
+                printf 'Fehlender Wert für --bind.\n' >&2
+                exit 2
+            fi
+            BIND_ARG="$2"
+            shift 2
+            ;;
+        --bind=*) BIND_ARG="${1#*=}"; shift ;;
         *)
-            printf 'Unbekannte Option: %s\n\n' "$arg" >&2
+            printf 'Unbekannte Option: %s\n\n' "$1" >&2
             usage >&2
             exit 2
             ;;
     esac
 done
+
+if [[ -n "$BIND_ARG" && "$BIND_ARG" != "local" && "$BIND_ARG" != "lan" ]]; then
+    printf 'Ungültiger Wert für --bind: %s (erlaubt: local, lan)\n' "$BIND_ARG" >&2
+    exit 2
+fi
 
 if [[ "$USE_COLOR" == "0" ]]; then
     PINK=""; CYAN=""; RED=""; GRAY=""; BOLD=""; RESET=""
@@ -121,7 +137,7 @@ if [[ "$EUID" -ne 0 ]]; then
             printf '  bash /tmp/grillabend-install.sh\n' >&2
             exit 1
         fi
-        exec sudo -- bash "$SELF" "$@"
+        exec sudo -- bash "$SELF" "${ORIGINAL_ARGS[@]}"
     fi
     printf 'Bitte als root ausführen (sudo bash %s).\n' "$SELF" >&2
     exit 1
@@ -1347,7 +1363,10 @@ main() {
     esac
 
     ui_cleanup
-    [[ -n "$FINAL_HINT" ]] && printf '\n%s\n' "$FINAL_HINT"
+    if [[ -n "$FINAL_HINT" ]]; then
+        printf '\n%s\n' "$FINAL_HINT"
+    fi
+    return 0
 }
 
 main

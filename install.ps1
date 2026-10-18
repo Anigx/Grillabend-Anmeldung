@@ -550,15 +550,19 @@ function Assert-Windows {
         Write-Log 'Virtualisierung konnte nicht eindeutig geprüft werden.'
     }
 
+    $free = $null
     try {
         $free = (Get-PSDrive -Name C -ErrorAction Stop).Free
+    } catch {
+        Write-Log "Freier Speicher auf Laufwerk C: konnte nicht ermittelt werden: $($_.Exception.Message)"
+    }
+    if ($null -ne $free) {
         if ($free -lt 2GB) {
             Throw-Fatal 'Auf Laufwerk C: sind weniger als 2 GB frei. Docker Desktop und das Image benötigen mehr Speicher.'
         }
         if ($free -lt 5GB) {
             Show-Message 'Wenig Speicherplatz' 'Auf Laufwerk C: sind weniger als 5 GB frei. Der Docker-Desktop-Download und das Image können den Platzbedarf erhöhen.'
         }
-    } catch {
     }
 }
 
