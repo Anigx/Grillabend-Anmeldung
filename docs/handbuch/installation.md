@@ -23,6 +23,7 @@ bash /tmp/grillabend-install.sh
 - Das Image wird als `ghcr.io/anigx/grillabend-anmeldung:latest` gezogen. Es gibt nur `linux/amd64`; ARM-Systeme (z. B. Raspberry Pi) werden abgelehnt.
 - Ein Update sichert die SQLite-Datenbank vorher automatisch (die letzten fünf Backups bleiben unter `backups/`). `--uninstall` entfernt Container und Image, behält Projektordner, Volume und Backups. `--purge` entfernt zusätzlich Volume, Projektordner und Backups.
 - Ein lokaler Reverse Proxy kann anschließend auf `127.0.0.1:1621` zeigen. Das Skript installiert bewusst **kein** Nginx und kein Zertifikat; dafür gelten die Hinweise unter [Betrieb](betrieb.md).
+- Weitere Optionen: `bash install.sh --help` (u. a. `--install-dir`, `--bind local|lan`, `--yes`, `--no-color`). Die TUI führt durch die normalen Fragen.
 
 ### Windows (Docker Desktop, ohne WSL-Distribution)
 
@@ -30,13 +31,16 @@ bash /tmp/grillabend-install.sh
 irm https://raw.githubusercontent.com/Anigx/Grillabend-Anmeldung/main/bootstrap.ps1 | iex
 ```
 
-- Der Einzeiler lädt den schlanken Bootstrap aus dem `main`-Branch. Dieser legt den vollständigen Installer unter `%PUBLIC%\Grillabend-Installer\install.ps1` ab und startet die TUI; bei fehlenden Adminrechten wird er per UAC erhöht. Nur ausführen, wenn du dem Repository vertraust. Die heruntergeladene Datei bleibt für spätere Aufrufe mit Optionen (z. B. `-Uninstall`) liegen.
-- Unterstützt Windows 11 sowie Windows 10 22H2 mit Warnung; nur x64. Die TUI benötigt eine normale PowerShell-Konsole (nicht ISE); bei fehlenden Adminrechten öffnet sich ein erhöhtes Fenster. Docker Desktop wird bei Bedarf per `winget` installiert. WSL2 wird **nur als von Docker Desktop benötigtes Backend** aktiviert; es wird keine Ubuntu-Distribution eingerichtet. Git wird bei Bedarf per `winget` installiert.
+- Der Einzeiler lädt den schlanken Bootstrap aus dem `main`-Branch. Dieser legt den vollständigen Installer unter `%PUBLIC%\Grillabend-Installer\install.ps1` ab und startet die TUI; bei fehlenden Adminrechten wird er per UAC erhöht. Nur ausführen, wenn du dem Repository vertraust.
+- **Nicht `/install.ps1 | iex` verwenden:** `install.ps1` ist der vollständige Installer mit UTF-8-BOM; `iex` scheitert daran. Der Einzeiler zeigt deshalb auf `bootstrap.ps1`.
+- Die heruntergeladene Datei bleibt für spätere Aufrufe mit Optionen liegen, z. B. `powershell -NoProfile -ExecutionPolicy Bypass -File "$env:PUBLIC\Grillabend-Installer\install.ps1" -Uninstall` oder `-Purge`. Die gleichen Optionen bietet die TUI.
+- Unterstützt Windows 11 sowie Windows 10 22H2 mit Warnung; nur x64. Die TUI benötigt eine normale PowerShell-Konsole (nicht ISE); bei fehlenden Adminrechten öffnet sich ein erhöhtes Fenster. Docker Desktop wird bei Bedarf per `winget` installiert; dafür muss der Microsoft App Installer (`winget`) vorhanden sein, sonst bricht der Installer mit einem Hinweis ab. WSL2 wird **nur als von Docker Desktop benötigtes Backend** aktiviert; es wird keine Ubuntu-Distribution eingerichtet. Git wird bei Bedarf per `winget` installiert.
 - Standardziel ist `%USERPROFILE%\Grillabend-Anmeldung`, der Pfad wird abgefragt. Status und Logs: `%ProgramData%\Grillabend-Installer`.
 - **Bindung:** Standard ist die LAN-Freigabe (`0.0.0.0:1621`) nach ausdrücklicher Bestätigung. Der Installer legt eine Windows-Firewall-Regel für TCP 1621 in privaten/Domänen-Netzen und dem lokalen Subnetz an. „Nur lokal“ (`127.0.0.1:1621`) ist ebenfalls wählbar. Die App spricht nur HTTP; im LAN sind Zugangsdaten unverschlüsselt.
 - Docker Desktop wird beim Anmelden über eine Aufgabe gestartet, damit der Container mit `restart: unless-stopped` wieder hochkommt. Die Aufgabe und die Firewall-Regel werden nur von der App angelegt und bei der Deinstallation entfernt; Docker Desktop, WSL2 und Git bleiben installiert.
-- Ein Neustart nach der WSL2-Aktivierung wird erkannt. Nach dem Neustart den Installer erneut starten; er bietet das Fortsetzen an. Updates sichern die Datenbank automatisch. `-Uninstall` behält Daten, `-Purge` löscht zusätzlich Volume, Projekt und Backups.
+- Ein Neustart nach der WSL2-Aktivierung oder Docker-Desktop-Installation wird erkannt. Nach dem Neustart den Installer erneut starten; er bietet das Fortsetzen an. Updates sichern die Datenbank automatisch. `-Uninstall` behält Daten, `-Purge` löscht zusätzlich Volume, Projekt und Backups.
 - Docker Desktop ist für Privatanwender, Bildung und kleine Unternehmen kostenlos; für größere Unternehmen gelten die Lizenzbedingungen von Docker. Der Installer zeigt vor der Installation einen entsprechenden Hinweis.
+- Weitere Optionen des heruntergeladenen Installers: `-Help` (u. a. `-InstallDir`, `-Bind local|lan`, `-Yes`, `-NoPause`). Die TUI führt durch die normalen Fragen.
 
 ## Installation mit Docker (manuell)
 
@@ -48,7 +52,7 @@ docker compose up -d
 docker compose logs -f grillabend
 ```
 
-- Compose verwendet das veröffentlichte Image `ghcr.io/anigx/grillabend-anmeldung:latest`, den Container `grillabend` und das Volume `grillabend-data`. Node lauscht im Container nur auf **HTTP-Port 80**; veröffentlicht wird `127.0.0.1:1621 → 80`. Image, Portmapping und Volume stehen fest in `compose.yaml`; `NODE_ENV`, `PORT` und `DATA_DIR` kommen aus dem Image. Es gibt keine `.env`. Für die LAN-Freigabe legt der Installer eine lokale, nicht versionierte `compose.override.yaml` an (`0.0.0.0:1621:80`); ohne diese Datei bleibt es bei der Loopback-Bindung.
+- Compose verwendet das veröffentlichte Image `ghcr.io/anigx/grillabend-anmeldung:latest`, den Container `grillabend` und das Volume `grillabend-data`. Node lauscht im Container nur auf **HTTP-Port 80**; veröffentlicht wird `127.0.0.1:1621 → 80`. Image, Portmapping und Volume stehen fest in `compose.yaml`; `NODE_ENV`, `PORT` und `DATA_DIR` kommen aus dem Image. Die App und Compose verwenden keine `.env`; eine lokale Datei wird nicht ausgewertet. Für die LAN-Freigabe legt der Installer eine lokale, nicht versionierte `compose.override.yaml` an (`0.0.0.0:1621:80`); ohne diese Datei bleibt es bei der Loopback-Bindung.
 - **Selbstsigniertes HTTPS (Test):** `sudo bash deploy/setup-https-selfsigned.sh <host-oder-ip>` installiert Nginx, erzeugt ein selbstsigniertes Zertifikat, richtet die HTTP→HTTPS-Umleitung ein und proxyt 443 auf `127.0.0.1:1621`. Einzelheiten zu Nginx-Vorlage und Volume-Backup stehen unter [Betrieb](betrieb.md).
 - Die App hat keinen Origin-/CSRF-Check und setzt keine `Secure`-Cookies. Sie darf deshalb nicht direkt öffentlich erreichbar sein; TLS und Zugriffsschutz gehören in den vorgelagerten Proxy.
 

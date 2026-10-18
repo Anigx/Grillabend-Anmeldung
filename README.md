@@ -35,7 +35,7 @@ Ohne `curl` alternativ `wget -qO /tmp/grillabend-install.sh <URL> && bash /tmp/g
 irm https://raw.githubusercontent.com/Anigx/Grillabend-Anmeldung/main/bootstrap.ps1 | iex
 ```
 
-Der Windows-Installer richtet Docker Desktop per `winget` ein und aktiviert WSL2 ausschließlich als Docker-Backend (keine Ubuntu-Distribution). Standard ist die LAN-Freigabe auf `0.0.0.0:1621` mit Bestätigung und einer Firewall-Regel für private/Domänen-Netze; „nur lokal“ ist ebenfalls wählbar. Docker Desktop, WSL2 und Git werden bei einer Deinstallation nicht entfernt.
+Wichtig: Nicht `/install.ps1 | iex` verwenden – diese Datei ist der vollständige Installer mit UTF-8-BOM und wird vom Bootstrap als Datei gestartet. Der Windows-Installer richtet Docker Desktop per `winget` ein und aktiviert WSL2 ausschließlich als Docker-Backend (keine Ubuntu-Distribution). Standard ist die LAN-Freigabe auf `0.0.0.0:1621` mit Bestätigung und einer Firewall-Regel für private/Domänen-Netze; „nur lokal“ ist ebenfalls wählbar. Docker Desktop, WSL2 und Git werden bei einer Deinstallation nicht entfernt.
 
 Status und Logs liegen unter `/var/lib/grillabend-installer` bzw. `/var/log/grillabend-installer` (Linux) und `%ProgramData%\Grillabend-Installer` (Windows). Updates sichern die SQLite-Datenbank automatisch. Entfernen: `--uninstall` (App, Daten bleiben) oder `--purge` (inklusive Volume, Projekt und Backups); unter Windows `-Uninstall` bzw. `-Purge`. Details: [Installation](docs/handbuch/installation.md).
 
