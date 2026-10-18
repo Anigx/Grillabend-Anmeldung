@@ -26,7 +26,7 @@ Sitzungen laufen nach sieben Tagen ab; abgelaufene Einträge werden beim Start u
 | Betriebssystem | Status/Logs | Entfernen |
 | --- | --- | --- |
 | Linux | `/var/lib/grillabend-installer/state`, `/var/log/grillabend-installer/` | `bash install.sh --uninstall` bzw. `--purge` |
-| Windows | `%ProgramData%\Grillabend-Installer\state.json`, `...\Logs\` | `powershell -NoProfile -ExecutionPolicy Bypass -File "$env:PUBLIC\Grillabend-Installer\install.ps1" -Uninstall` bzw. `-Purge`; alternativ die TUI |
+| Windows | `%ProgramData%\Grillabend-Installer\state.json`, `...\Logs\` | `powershell -NoProfile -ExecutionPolicy Bypass -File "$env:LOCALAPPDATA\Grillabend-Installer\install.ps1" -Uninstall` bzw. `-Purge`; alternativ die TUI |
 
 - **Linux:** Standardziel `/opt/grillabend`, Standardbindung nur lokal (`127.0.0.1:1621`). Docker wird bei Bedarf aus dem offiziellen Repository installiert. Nginx/HTTPS werden nicht eingerichtet; der spätere Proxy zeigt auf `127.0.0.1:1621`.
 - **Windows:** Standardziel `%USERPROFILE%\Grillabend-Anmeldung`, Standardbindung LAN (`0.0.0.0:1621`) nach Bestätigung; Firewall-Regel nur für private/Domänen-Netze und das lokale Subnetz. Docker Desktop wird per `winget` installiert; WSL2 dient nur als Backend, ohne Ubuntu-Distribution.

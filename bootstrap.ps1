@@ -7,9 +7,11 @@ try {
 } catch {
 }
 
+# Per-user directory: %PUBLIC% is writable by other interactive users and must
+# not hold the script that is later started elevated.
 $url = 'https://raw.githubusercontent.com/Anigx/Grillabend-Anmeldung/main/install.ps1'
-$targetDir = if ($env:PUBLIC) {
-    Join-Path $env:PUBLIC 'Grillabend-Installer'
+$targetDir = if ($env:LOCALAPPDATA) {
+    Join-Path $env:LOCALAPPDATA 'Grillabend-Installer'
 } else {
     Join-Path $env:TEMP 'Grillabend-Installer'
 }

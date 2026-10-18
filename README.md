@@ -29,7 +29,7 @@ curl -fsSL https://raw.githubusercontent.com/Anigx/Grillabend-Anmeldung/main/ins
 
 Ohne `curl` alternativ `wget -qO /tmp/grillabend-install.sh <URL> && bash /tmp/grillabend-install.sh`. Standardziel ist `/opt/grillabend`; die Bindung ist standardmäßig nur lokal (`127.0.0.1:1621`) für einen späteren Reverse Proxy. LAN-Freigabe ist mit Sicherheitswarnung wählbar.
 
-**Windows** (PowerShell; der Bootstrap lädt den Installer nach `%PUBLIC%\Grillabend-Installer` und startet ihn bei fehlenden Adminrechten per UAC neu):
+**Windows** (PowerShell; der Bootstrap lädt den Installer nach `%LOCALAPPDATA%\Grillabend-Installer` und startet ihn bei fehlenden Adminrechten per UAC neu):
 
 ```powershell
 irm https://raw.githubusercontent.com/Anigx/Grillabend-Anmeldung/main/bootstrap.ps1 | iex

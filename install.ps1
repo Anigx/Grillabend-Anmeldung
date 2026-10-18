@@ -107,6 +107,10 @@ if ($Version) {
 
 $script:RequestedBind = $Bind
 $script:RequestedInstallDir = $InstallDir
+if ($script:RequestedInstallDir) {
+    $script:RequestedInstallDir = $script:RequestedInstallDir.TrimEnd('\')
+    if ($script:RequestedInstallDir -match '^[A-Za-z]:$') { $script:RequestedInstallDir += '\' }
+}
 $script:OriginalProfile = $OriginalProfile
 $script:OriginalUser = $OriginalUser
 
@@ -130,7 +134,7 @@ $userName = if ($script:OriginalUser) { $script:OriginalUser } else { "$env:USER
 $pipedMode = -not $scriptPath
 
 if ($pipedMode) {
-    $bootstrapDir = if ($env:PUBLIC) { Join-Path $env:PUBLIC 'Grillabend-Installer' } else { Join-Path $env:TEMP 'Grillabend-Installer' }
+    $bootstrapDir = if ($env:LOCALAPPDATA) { Join-Path $env:LOCALAPPDATA 'Grillabend-Installer' } else { Join-Path $env:TEMP 'Grillabend-Installer' }
     try {
         New-Item -ItemType Directory -Force -Path $bootstrapDir -ErrorAction Stop | Out-Null
         $scriptPath = Join-Path $bootstrapDir 'install.ps1'
@@ -802,21 +806,43 @@ function Test-VersionAtLeast {
     return ($haveVersion -ge $needVersion)
 }
 
+function Get-ForbiddenProjectPaths {
+    $paths = @(
+        'C:\Windows',
+        'C:\Program Files',
+        'C:\Program Files (x86)',
+        'C:\ProgramData'
+    )
+    foreach ($candidate in @($env:SystemRoot, $env:ProgramFiles, ${env:ProgramFiles(x86)}, $env:ProgramData, $env:USERPROFILE, $env:PUBLIC, $env:LOCALAPPDATA, $env:APPDATA)) {
+        if ($candidate) { $paths += $candidate }
+    }
+    if ($env:USERPROFILE) {
+        $usersRoot = Split-Path -Parent $env:USERPROFILE
+        if ($usersRoot) { $paths += $usersRoot }
+        $paths += (Join-Path $env:USERPROFILE 'Default')
+    }
+    return @($paths | Where-Object { $_ } | ForEach-Object { ([IO.Path]::GetFullPath($_)).TrimEnd('\') } | Select-Object -Unique)
+}
+
 function Resolve-TargetPath {
     param([string]$Path)
     if (-not $Path) { Throw-Fatal 'Es wurde kein Zielverzeichnis angegeben.' }
+    $base = if ($script:OriginalProfile) { $script:OriginalProfile } else { $env:USERPROFILE }
     $expanded = [Environment]::ExpandEnvironmentVariables($Path)
+    if ($expanded -eq '~') {
+        $expanded = $base
+    } elseif ($expanded -like '~\*' -or $expanded -like '~/*') {
+        $expanded = Join-Path $base $expanded.Substring(2)
+    }
     if (-not [IO.Path]::IsPathRooted($expanded)) {
-        $base = if ($script:OriginalProfile) { $script:OriginalProfile } else { $env:USERPROFILE }
         $expanded = Join-Path $base $expanded
     }
     try { $full = [IO.Path]::GetFullPath($expanded) } catch { Throw-Fatal "Ungültiger Pfad: $Path" }
     $root = [IO.Path]::GetPathRoot($full)
-    if ($full -ieq $root) { Throw-Fatal "Der Systempfad $full ist als Projektordner nicht erlaubt." }
+    if ($full.TrimEnd('\') -ieq $root.TrimEnd('\')) { Throw-Fatal "Der Systempfad $full ist als Projektordner nicht erlaubt." }
     $full = $full.TrimEnd('\')
     if (-not $full) { Throw-Fatal 'Ungültiger Zielpfad.' }
-    $forbidden = @('C:\', 'C:\Windows', 'C:\Program Files', 'C:\Program Files (x86)', 'C:\ProgramData')
-    foreach ($bad in $forbidden) {
+    foreach ($bad in (Get-ForbiddenProjectPaths)) {
         if ($full -ieq $bad) { Throw-Fatal "Der Systempfad $full ist als Projektordner nicht erlaubt." }
     }
     try { New-Item -ItemType Directory -Force -Path $full -ErrorAction Stop | Out-Null } catch { Throw-Fatal "Das Verzeichnis $full konnte nicht angelegt werden: $($_.Exception.Message)" }
@@ -976,7 +1002,7 @@ function Clone-Project {
     $gitDir = Join-Path $Dir '.git'
     if ((Test-Path -LiteralPath $compose) -and (Test-Path -LiteralPath $gitDir)) {
         Write-Log "Bestehendes Projekt erkannt: $Dir"
-        $rc = Invoke-External 'Projekt aktualisieren' "git -C `"$Dir`" pull --ff-only" { git -C $Dir pull --ff-only }
+        $rc = Invoke-External 'Projekt aktualisieren' "git -c safe.directory=`"$Dir`" -C `"$Dir`" pull --ff-only" { git -c "safe.directory=$Dir" -C $Dir pull --ff-only }
         if ($rc -ne 0) { Write-Log 'git pull fehlgeschlagen; vorhandene Projektdateien werden verwendet.' }
         Write-GitExcludes $Dir
         return
@@ -1263,10 +1289,10 @@ function Invoke-InstallFlow {
     if ($script:RequestedBind) {
         if (-not (Set-BindMode $script:RequestedBind $true)) {
             $script:RequestedBind = $null
-            if (-not (Ask-BindMode ([string](Get-State 'bind')))) { return }
+            if (-not (Ask-BindMode ([string](Get-State 'bind')))) { return $false }
         }
     } elseif (-not $Resume -or -not (Get-State 'bind')) {
-        if (-not (Ask-BindMode 'lan')) { return }
+        if (-not (Ask-BindMode 'lan')) { return $false }
     } else {
         $script:BindMode = [string](Get-State 'bind')
         if (-not $script:BindMode) { $script:BindMode = 'lan' }
@@ -1277,7 +1303,7 @@ function Invoke-InstallFlow {
     Ensure-Git
 
     Set-State 'step' 'docker'
-    if (-not (Ensure-DockerEngine)) { return }
+    if (-not (Ensure-DockerEngine)) { return $false }
 
     Set-State 'step' 'clone'
     Clone-Project $dir
@@ -1314,6 +1340,7 @@ function Invoke-InstallFlow {
     Set-State 'bind' $script:BindMode
     Set-State 'install_dir' $dir
     Show-AccessInfo
+    return $true
 }
 
 function Resolve-ProjectForManagement {
@@ -1340,23 +1367,23 @@ function Invoke-UpdateFlow {
     $dir = Resolve-ProjectForManagement
     if (-not $dir) {
         Show-Message 'Nicht gefunden' 'Es wurde keine bestehende Installation gefunden.'
-        return
+        return $false
     }
     $currentBind = [string](Get-State 'bind')
     if (-not $currentBind) { $currentBind = $script:BindMode }
     $script:BindMode = $currentBind
     Set-State 'mode' 'update'
 
-    if (-not (Show-Confirm 'Aktualisieren' "Die Installation in $dir wird aktualisiert. Vorher wird ein Backup der Datenbank erstellt. Fortfahren?" $true)) { return }
+    if (-not (Show-Confirm 'Aktualisieren' "Die Installation in $dir wird aktualisiert. Vorher wird ein Backup der Datenbank erstellt. Fortfahren?" $true)) { return $false }
 
     if (Show-Confirm 'Bindung ändern?' "Soll die Netzwerkbindung geändert werden? Aktuell: $currentBind." $false) {
-        if (-not (Ask-BindMode $currentBind)) { return }
+        if (-not (Ask-BindMode $currentBind)) { return $false }
     } else {
         Set-State 'bind' $script:BindMode
     }
 
     Set-State 'step' 'update-docker'
-    if (-not (Ensure-DockerEngine)) { return }
+    if (-not (Ensure-DockerEngine)) { return $false }
     Test-PortAvailable
 
     Set-State 'step' 'update-pull-base'
@@ -1377,7 +1404,7 @@ function Invoke-UpdateFlow {
     }
 
     Set-State 'step' 'update-git'
-    $rc = Invoke-External 'Projekt aktualisieren' "git -C `"$dir`" pull --ff-only" { git -C $dir pull --ff-only }
+    $rc = Invoke-External 'Projekt aktualisieren' "git -c safe.directory=`"$dir`" -C `"$dir`" pull --ff-only" { git -c "safe.directory=$dir" -C $dir pull --ff-only }
     if ($rc -ne 0) {
         Invoke-ComposeUp $dir
         Throw-Fatal 'git pull ist fehlgeschlagen. Lokale Änderungen prüfen; die App wurde mit dem vorhandenen Stand neu gestartet.'
@@ -1416,6 +1443,7 @@ function Invoke-UpdateFlow {
     Set-State 'install_dir' $dir
     Set-State 'bind' $script:BindMode
     Show-Message 'Update abgeschlossen' "Die App läuft wieder. Ersteinrichtung/Anmeldung: http://127.0.0.1:$script:HostPort/setup`nLog: $script:LogFile"
+    return $true
 }
 
 function Remove-DockerAutostartTask {
@@ -1431,9 +1459,12 @@ function Remove-DockerAutostartTask {
 function Remove-ProjectDirSafely {
     param([string]$Dir)
     if (-not $Dir) { return }
-    $full = [IO.Path]::GetFullPath($Dir).TrimEnd('\')
-    $forbidden = @('C:\', 'C:\Windows', 'C:\Program Files', 'C:\Program Files (x86)', 'C:\ProgramData')
-    foreach ($bad in $forbidden) {
+    try { $fullPath = [IO.Path]::GetFullPath($Dir) } catch { Throw-Fatal "Sicherheitsabbruch: $Dir ist kein gültiger Pfad." }
+    $root = [IO.Path]::GetPathRoot($fullPath)
+    if ($fullPath.TrimEnd('\') -ieq $root.TrimEnd('\')) { Throw-Fatal "Sicherheitsabbruch: $fullPath wird nicht gelöscht." }
+    $full = $fullPath.TrimEnd('\')
+    if (-not $full) { Throw-Fatal 'Sicherheitsabbruch: Ungültiger Pfad.' }
+    foreach ($bad in (Get-ForbiddenProjectPaths)) {
         if ($full -ieq $bad) { Throw-Fatal "Sicherheitsabbruch: $full wird nicht gelöscht." }
     }
     $isProject = Test-Path -LiteralPath (Join-Path $full 'compose.yaml')
@@ -1555,11 +1586,10 @@ function Show-MainMenu {
                 'Beenden::Installer schließen.'
             )
             switch ($result) {
-                0 { Invoke-UpdateFlow; return }
+                0 { if (Invoke-UpdateFlow) { return } }
                 1 {
                     if (Show-Confirm 'Neu installieren' 'Projektdateien werden neu eingerichtet; das Daten-Volume grillabend-data bleibt erhalten. Fortfahren?' $true) {
-                        Invoke-InstallFlow
-                        return
+                        if (Invoke-InstallFlow) { return }
                     }
                 }
                 2 { if (Show-DeinstallMenu) { return } }
@@ -1572,7 +1602,7 @@ function Show-MainMenu {
                 'Beenden::Installer schließen.'
             )
             switch ($result) {
-                0 { Invoke-InstallFlow; return }
+                0 { if (Invoke-InstallFlow) { return } }
                 1 { if (Show-DeinstallMenu) { return } }
                 default { return }
             }
