@@ -23,6 +23,7 @@ param(
     [switch]$Yes,
     [switch]$NoPause,
     [switch]$SelfTest,
+    [switch]$ForceLocalNode,
     [string]$Bind,
     [string]$InstallDir,
     [int]$Port = 1621,
@@ -65,6 +66,9 @@ $script:AppDir = $null
 $script:NodeDir = $null
 $script:StartScript = $null
 $script:SelfTestMode = $false
+$script:NodeExe = $null
+$script:NodeSource = $null
+$script:ForceLocalNode = [bool]$ForceLocalNode
 
 try {
     [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false)
@@ -85,6 +89,7 @@ Aufruf:
   .\install-native.ps1 -Uninstall         App entfernen, Daten behalten
   .\install-native.ps1 -Purge             App, Node.js, Daten und Backups löschen
   .\install-native.ps1 -SelfTest          Nur Download/npm/Start testen (temporäres Verzeichnis)
+  .\install-native.ps1 -SelfTest -ForceLocalNode  Selbsttest mit lokalem Node.js-Download
   .\install-native.ps1 -Help              Diese Hilfe anzeigen
   .\install-native.ps1 -Version           Installer-Version anzeigen
 
@@ -94,6 +99,7 @@ Optionen:
   -Port NUMMER        TCP-Port vorbelegen (Standard: 1621)
   -Yes                Sicherheitsabfragen bei -Uninstall/-Purge überspringen
   -NoPause            Nicht auf Enter warten, wenn das Skript endet
+  -ForceLocalNode     Vorhandenes Node.js ignorieren und lokal installieren
 
 Der Installer lädt Node.js 22 als offizielles ZIP (SHA-256-geprüft) und die
 App als GitHub-ZIP. Es werden weder Docker noch WSL oder Git benötigt. Die
@@ -168,6 +174,7 @@ if ($Purge) { $argString += ' -Purge' }
 if ($Yes) { $argString += ' -Yes' }
 if ($NoPause) { $argString += ' -NoPause' }
 if ($SelfTest) { $argString += ' -SelfTest' }
+if ($ForceLocalNode) { $argString += ' -ForceLocalNode' }
 
 if (-not $SelfTest -and -not $Help -and -not $Version -and -not (Test-Admin)) {
     try {
@@ -689,13 +696,64 @@ function Get-NodeExeVersion {
     return ($result.Output -replace '^v', '').Trim()
 }
 
+function Find-SystemNode {
+    $candidates = @()
+    if ($env:ProgramFiles) {
+        $candidate = Join-Path $env:ProgramFiles 'nodejs\node.exe'
+        if (Test-Path -LiteralPath $candidate) { $candidates += $candidate }
+    }
+    $programFilesX86 = ${env:ProgramFiles(x86)}
+    if ($programFilesX86) {
+        $candidate = Join-Path $programFilesX86 'nodejs\node.exe'
+        if (Test-Path -LiteralPath $candidate) { $candidates += $candidate }
+    }
+    $command = Get-Command node -ErrorAction SilentlyContinue
+    if ($command -and $command.Source) { $candidates += $command.Source }
+    foreach ($exe in ($candidates | Select-Object -Unique)) {
+        $version = Get-NodeExeVersion $exe
+        if (-not $version -or -not (Test-VersionAtLeast $version $script:NodeMinVersion)) { continue }
+        $npmCli = Join-Path (Split-Path -Parent $exe) 'node_modules\npm\bin\npm-cli.js'
+        if (-not (Test-Path -LiteralPath $npmCli)) { continue }
+        return [pscustomobject]@{ Exe = $exe; Version = $version; NpmCli = $npmCli }
+    }
+    return $null
+}
+
 function Install-NodeRuntime {
     param([string]$TargetNodeDir)
     $nodeExe = Join-Path $TargetNodeDir 'node.exe'
     $current = Get-NodeExeVersion $nodeExe
     if ($current -and (Test-VersionAtLeast $current $script:NodeMinVersion)) {
-        Write-Log "Vorhandenes Node.js $current wird verwendet: $nodeExe"
+        $script:NodeExe = $nodeExe
+        $script:NodeSource = 'lokal'
+        Write-Log "Vorhandenes lokales Node.js $current wird verwendet: $nodeExe"
         return $nodeExe
+    }
+
+    if (-not $script:ForceLocalNode) {
+        $system = Find-SystemNode
+        if ($system) {
+            $useSystem = $true
+            if (-not $script:SelfTestMode) {
+                $useSystem = Show-Confirm 'Node.js vorhanden' "Node.js $($system.Version) ist bereits vorhanden:`n$($system.Exe)`nSoll es verwendet werden? (Nein: lokale Node.js-Installation unter $TargetNodeDir)" $true
+            }
+            if ($useSystem) {
+                $script:NodeExe = $system.Exe
+                $script:NodeSource = 'vorhanden'
+                Set-State 'node_source' 'existing'
+                Set-State 'node_exe' $system.Exe
+                Write-Log "Vorhandenes Node.js $($system.Version) wird verwendet: $($system.Exe)"
+                if (Test-Path -LiteralPath $TargetNodeDir) {
+                    try {
+                        Remove-Item -LiteralPath $TargetNodeDir -Recurse -Force -ErrorAction Stop
+                        Write-Log "Nicht mehr benötigte lokale Node.js-Installation entfernt: $TargetNodeDir"
+                    } catch {
+                        Write-Log "Alte lokale Node.js-Installation konnte nicht entfernt werden: $($_.Exception.Message)"
+                    }
+                }
+                return $system.Exe
+            }
+        }
     }
 
     $arch = Get-WindowsNodeArch
@@ -753,6 +811,10 @@ function Install-NodeRuntime {
         Throw-Fatal "Node.js wurde installiert, meldet aber keine passende Version (gefunden: $installed)."
     }
     Write-Log "Node.js $installed installiert: $nodeExe"
+    $script:NodeExe = $nodeExe
+    $script:NodeSource = 'lokal'
+    Set-State 'node_source' 'local'
+    Set-State 'node_exe' $nodeExe
     return $nodeExe
 }
 
@@ -773,9 +835,12 @@ function Install-AppFiles {
             Throw-Fatal 'Das App-Archiv ist unvollständig (package.json fehlt).'
         }
         if (Test-Path -LiteralPath $TargetDir) {
-            Remove-Item -LiteralPath $TargetDir -Recurse -Force -ErrorAction Stop
+            Get-ChildItem -LiteralPath $TargetDir -Force -ErrorAction Stop |
+                Where-Object { $_.Name -notin @('node_modules', 'data') } |
+                Remove-Item -Recurse -Force -ErrorAction Stop
+        } else {
+            New-Item -ItemType Directory -Force -Path $TargetDir -ErrorAction Stop | Out-Null
         }
-        New-Item -ItemType Directory -Force -Path $TargetDir -ErrorAction Stop | Out-Null
         foreach ($item in @('server.js', 'src', 'public', 'package.json', 'package-lock.json')) {
             $source = Join-Path $root.FullName $item
             if (-not (Test-Path -LiteralPath $source)) {
@@ -790,20 +855,47 @@ function Install-AppFiles {
     }
 }
 
+function Get-LockHash {
+    param([string]$Dir)
+    $lock = Join-Path $Dir 'package-lock.json'
+    if (-not (Test-Path -LiteralPath $lock)) { return $null }
+    return (Get-FileHash -LiteralPath $lock -Algorithm SHA256).Hash.ToLowerInvariant()
+}
+
+function Test-NodeModulesCurrent {
+    param([string]$Dir, [string]$LockHash)
+    if (-not $LockHash) { return $false }
+    $modules = Join-Path $Dir 'node_modules'
+    $marker = Join-Path $modules '.grillabend-lock-hash'
+    if (-not (Test-Path -LiteralPath $modules) -or -not (Test-Path -LiteralPath $marker)) { return $false }
+    try {
+        $stored = (Get-Content -LiteralPath $marker -Raw -ErrorAction Stop).Trim().ToLowerInvariant()
+    } catch {
+        return $false
+    }
+    return ($stored -eq $LockHash)
+}
+
 function Invoke-NpmCi {
     param([string]$AppDir, [string]$NodeExe)
+    $lockHash = Get-LockHash $AppDir
+    if (Test-NodeModulesCurrent $AppDir $lockHash) {
+        Write-Log "npm ci übersprungen: package-lock.json unverändert ($lockHash)."
+        Write-Host 'npm ci übersprungen: package-lock.json unverändert.' -ForegroundColor DarkGray
+        return
+    }
     $npmCli = Join-Path (Split-Path -Parent $NodeExe) 'node_modules\npm\bin\npm-cli.js'
     if (-not (Test-Path -LiteralPath $npmCli)) {
         Throw-Fatal "npm wurde neben Node.js nicht gefunden: $npmCli"
     }
     New-Item -ItemType Directory -Force -Path (Join-Path $script:DataDir 'npm-cache') -ErrorAction SilentlyContinue | Out-Null
-    $rc = Invoke-External 'npm-Abhängigkeiten installieren' 'npm ci --omit=dev --ignore-scripts' {
+    $rc = Invoke-External 'npm-Abhängigkeiten installieren' 'npm ci --omit=dev --ignore-scripts --no-audit --no-fund --loglevel=error' {
         Push-Location -LiteralPath $AppDir
         try {
             $env:Path = (Split-Path -Parent $NodeExe) + ';' + $env:Path
             $env:npm_config_cache = Join-Path $script:DataDir 'npm-cache'
             $env:npm_config_update_notifier = 'false'
-            & $NodeExe $npmCli ci --omit=dev --ignore-scripts
+            & $NodeExe $npmCli ci --omit=dev --ignore-scripts --no-audit --no-fund --loglevel=error
         } finally {
             Pop-Location
         }
@@ -811,7 +903,13 @@ function Invoke-NpmCi {
     if ($rc -ne 0) {
         Throw-Fatal 'npm ci ist fehlgeschlagen. Internetverbindung und App-Archiv prüfen.'
     }
-    Write-Log 'npm-Abhängigkeiten installiert.'
+    if ($lockHash) {
+        $marker = Join-Path $AppDir 'node_modules\.grillabend-lock-hash'
+        Set-Content -LiteralPath $marker -Value $lockHash -Encoding ASCII -ErrorAction Stop
+        Write-Log "npm-Abhängigkeiten installiert (Lockfile $lockHash)."
+    } else {
+        Write-Log 'npm-Abhängigkeiten installiert (kein package-lock.json gefunden).'
+    }
 }
 
 function Write-StartScript {
@@ -1064,6 +1162,7 @@ function Get-LanIPv4 {
 
 function Show-AccessInfo {
     $ip = Get-LanIPv4
+    $nodeInfo = if ($script:NodeExe) { "$script:NodeExe ($script:NodeSource)" } else { $script:NodeDir }
     if ($script:BindMode -eq 'lan') {
         $lanUrl = if ($ip) { "http://${ip}:$script:HostPort/setup" } else { "http://<LAN-IP>:$script:HostPort/setup" }
         $body = @"
@@ -1075,7 +1174,7 @@ Wichtig: Die App spricht nur HTTP. Im LAN sind Zugangsdaten unverschlüsselt.
 Für dauerhaften Betrieb einen HTTPS-Reverse-Proxy davorsetzen.
 
 App:     $script:AppDir
-Node.js: $script:NodeDir
+Node.js: $nodeInfo
 Daten:   $script:DataDir
 App-Log: $script:DataDir\app.log
 Log:     $script:LogFile
@@ -1092,7 +1191,7 @@ Ersteinrichtung: http://127.0.0.1:$script:HostPort/setup
 Von anderen Geräten ist die App nicht erreichbar.
 
 App:     $script:AppDir
-Node.js: $script:NodeDir
+Node.js: $nodeInfo
 Daten:   $script:DataDir
 App-Log: $script:DataDir\app.log
 Log:     $script:LogFile
@@ -1254,6 +1353,18 @@ function Invoke-UpdateFlow {
         Remove-Item -LiteralPath $staging -Recurse -Force -ErrorAction SilentlyContinue
         Remove-Item -LiteralPath $backupApp -Recurse -Force -ErrorAction SilentlyContinue
         Install-AppFiles $staging
+        $newLock = Get-LockHash $staging
+        if (Test-NodeModulesCurrent $script:AppDir $newLock) {
+            $reuseModules = Join-Path $staging 'node_modules.tmp'
+            try {
+                Copy-Item -LiteralPath (Join-Path $script:AppDir 'node_modules') -Destination $reuseModules -Recurse -Force -ErrorAction Stop
+                Move-Item -LiteralPath $reuseModules -Destination (Join-Path $staging 'node_modules') -Force -ErrorAction Stop
+                Write-Log 'node_modules aus dem bisherigen Stand übernommen (package-lock.json unverändert).'
+            } catch {
+                Remove-Item -LiteralPath $reuseModules -Recurse -Force -ErrorAction SilentlyContinue
+                Write-Log "node_modules konnte nicht übernommen werden; npm ci wird ausgeführt: $($_.Exception.Message)"
+            }
+        }
         Invoke-NpmCi $staging $nodeExe
 
         Set-State 'step' 'update-swap'
@@ -1456,6 +1567,8 @@ function Invoke-SelfTest {
     $script:DataDir = Join-Path $root 'data'
     $script:HostPort = 1625
     $script:LogFile = Join-Path $root 'selftest.log'
+    $script:StateDir = Join-Path $root 'state'
+    $script:StateFile = Join-Path $script:StateDir 'state.json'
     New-Item -ItemType Directory -Force -Path $root | Out-Null
     Set-Content -LiteralPath $script:LogFile -Value '' -Encoding UTF8
     Write-Log 'SelfTest gestartet.'
@@ -1465,6 +1578,32 @@ function Invoke-SelfTest {
         $nodeExe = Install-NodeRuntime $script:NodeDir
         Install-AppFiles $script:AppDir
         Invoke-NpmCi $script:AppDir $nodeExe
+        $lockHash = Get-LockHash $script:AppDir
+        if (-not (Test-NodeModulesCurrent $script:AppDir $lockHash)) {
+            throw 'SelfTest: Lock-Marker fehlt nach npm ci.'
+        }
+        Invoke-NpmCi $script:AppDir $nodeExe
+        Write-Host 'SELFTEST npm-ci-Skip OK' -ForegroundColor Green
+        Install-AppFiles $script:AppDir
+        if (-not (Test-NodeModulesCurrent $script:AppDir $lockHash)) {
+            throw 'SelfTest: node_modules wurde beim erneuten App-Installieren nicht erhalten.'
+        }
+        Invoke-NpmCi $script:AppDir $nodeExe
+        Write-Host 'SELFTEST Reinstall-Preserve OK' -ForegroundColor Green
+        $staging = Join-Path $root 'app.staging'
+        Install-AppFiles $staging
+        $stagingLock = Get-LockHash $staging
+        if (-not (Test-NodeModulesCurrent $script:AppDir $stagingLock)) {
+            throw 'SelfTest: Lock-Marker im App-Verzeichnis fehlt.'
+        }
+        $tmpModules = Join-Path $staging 'node_modules.tmp'
+        Copy-Item -LiteralPath (Join-Path $script:AppDir 'node_modules') -Destination $tmpModules -Recurse -Force -ErrorAction Stop
+        Move-Item -LiteralPath $tmpModules -Destination (Join-Path $staging 'node_modules') -Force -ErrorAction Stop
+        Invoke-NpmCi $staging $nodeExe
+        if (-not (Test-NodeModulesCurrent $staging $stagingLock)) {
+            throw 'SelfTest: Update-Staging-Marker fehlt.'
+        }
+        Write-Host 'SELFTEST Update-Staging OK' -ForegroundColor Green
         $env:NODE_ENV = 'production'
         $env:PORT = [string]$script:HostPort
         $env:HOST = '127.0.0.1'
@@ -1479,7 +1618,7 @@ function Invoke-SelfTest {
             throw 'SelfTest: Health-Check fehlgeschlagen.'
         }
         Write-Host 'SELFTEST OK' -ForegroundColor Green
-        Write-Host "Node: $((& $nodeExe --version))"
+        Write-Host "Node: $((& $nodeExe --version)) [$($script:NodeSource)]"
         Write-Host "App:  $script:AppDir"
         return 0
     } catch {

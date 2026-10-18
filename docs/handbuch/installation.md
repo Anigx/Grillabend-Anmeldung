@@ -44,7 +44,7 @@ irm https://raw.githubusercontent.com/Anigx/Grillabend-Anmeldung/main/bootstrap.
 
 ### Windows ohne Docker (bare metal, Node.js + npm)
 
-Diese Variante braucht weder Docker noch WSL oder Git. Sie lädt Node.js 22 als offizielles ZIP, prüft die SHA-256-Prüfsumme und installiert die App mit `npm ci --omit=dev --ignore-scripts`.
+Diese Variante braucht weder Docker noch WSL oder Git. Sie bietet ein vorhandenes Node.js ab 22.13 an und lädt sonst Node.js 22 als offizielles ZIP mit SHA-256-Prüfung. Die App kommt als GitHub-ZIP; `npm ci` läuft leise (`--no-audit --no-fund --loglevel=error`) und wird übersprungen, wenn sich `package-lock.json` nicht geändert hat.
 
 ```powershell
 irm https://raw.githubusercontent.com/Anigx/Grillabend-Anmeldung/main/bootstrap-native.ps1 | iex
@@ -54,10 +54,11 @@ irm https://raw.githubusercontent.com/Anigx/Grillabend-Anmeldung/main/bootstrap-
 - Standardziel ist `C:\Program Files\Grillabend` (App unter `app\`, Node.js unter `node\`); die Daten liegen unter `%ProgramData%\Grillabend`.
 - Die App läuft als geplante Aufgabe `Grillabend-Anmeldung` unter `SYSTEM` und startet beim Systemstart. Das App-Log steht unter `%ProgramData%\Grillabend\app.log`, die Installer-Logs unter `%ProgramData%\Grillabend-Installer-Native\Logs\`.
 - Standard ist die LAN-Freigabe auf `0.0.0.0:1621` nach Bestätigung mit einer Firewall-Regel für private/Domänen-Netze und das lokale Subnetz; „nur lokal“ (`127.0.0.1:1621`) ist wählbar.
-- Updates und Deinstallation über dieselbe TUI. Direkt: `.\install-native.ps1 -Uninstall` (Daten bleiben) bzw. `-Purge` (inklusive Node.js, Daten und Backups). `-SelfTest` prüft Download, npm und Start in einem temporären Verzeichnis, ohne Task oder Firewall-Regel anzulegen.
+- Ein vorhandenes Node.js wird nur angeboten, wenn es mindestens Version 22.13 hat; die lokale Installation bleibt der Fallback. `-ForceLocalNode` erzwingt die lokale Installation.
+- Updates und Deinstallation über dieselbe TUI. Direkt: `.\install-native.ps1 -Uninstall` (Daten bleiben) bzw. `-Purge` (inklusive Node.js, Daten und Backups). `-SelfTest` prüft Download, npm und Start in einem temporären Verzeichnis, ohne Task oder Firewall-Regel anzulegen; `-SelfTest -ForceLocalNode` testet zusätzlich den lokalen Node-Download.
 - Ein vorhandener Datenbestand kann vor der Installation nach `%ProgramData%\Grillabend\app.sqlite` kopiert werden. Die App verwendet diese Datei beim Start.
 - Nicht parallel zur Docker-Variante auf demselben Port betreiben; der Installer bricht bei belegtem Port mit einer Meldung ab.
-- Weitere Optionen: `-InstallDir PFAD`, `-Bind local|lan`, `-Port NUMMER`, `-Yes`, `-NoPause`, `-Help`, `-Version`.
+- Weitere Optionen: `-InstallDir PFAD`, `-Bind local|lan`, `-Port NUMMER`, `-ForceLocalNode`, `-Yes`, `-NoPause`, `-Help`, `-Version`.
 
 ## Installation mit Docker (manuell)
 
