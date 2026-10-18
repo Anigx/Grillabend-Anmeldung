@@ -19,7 +19,7 @@
 
 ## Daten und Sicherung
 
-- **Alle Daten liegen in `data/app.sqlite`.** Diese Datei wird nicht über HTTP ausgeliefert und ist von Git ausgeschlossen.
+- **Alle Daten liegen in `app.sqlite`.** Bei Docker im Volume `grillabend-data`, bei der Windows-Bare-Metal-Variante unter `%ProgramData%\Grillabend\app.sqlite`. Die Datei wird nicht über HTTP ausgeliefert und ist von Git ausgeschlossen.
 - **Sicherung:** Vor einem Versionswechsel oder Umzug die `data/app.sqlite` (bzw. das Docker-Volume) bei gestopptem Server separat sichern. Beim Umstieg auf die Zwei-Feld-Ausstattung lohnt sich eine Kopie vor dem ersten Start.
 - **Löschen ist endgültig.** Der Admin-Reset ist nicht rückgängig zu machen; ebenso entfernt das Löschen eines RSVP dauerhaft die eigene Antwort.
 
@@ -27,6 +27,6 @@
 
 - **Empfohlen wird der Betrieb per Docker/Compose** mit Portmapping und einem lokalen Nginx-Reverse-Proxy für TLS. Der Container heißt `grillabend` und spricht intern nur HTTP auf Port 80.
 - **App nie direkt öffentlich freigeben:** Standardbindung ist `127.0.0.1`; es gibt keinen Origin-/CSRF-Check und keine `Secure`-Cookies. Nur der Proxy darf 80/443 anbieten.
-- **LAN-Freigabe:** `install.sh` (Linux) und `install.ps1` (Windows) können die App auf `0.0.0.0:1621` freigeben. Das ist nur in einem vertrauenswürdigen Netz sinnvoll: Zugangsdaten und Cookies laufen unverschlüsselt. Windows legt eine Firewall-Regel für private/Domänen-Netze und das lokale Subnetz an; Linux bietet bei aktivem `ufw` optional eine Regel an. Für öffentliche Erreichbarkeit einen HTTPS-Proxy davorsetzen.
+- **LAN-Freigabe:** `install.sh` (Linux), `install.ps1` (Windows/Docker) und `install-native.ps1` (Windows bare metal) können die App auf `0.0.0.0:1621` freigeben. Das ist nur in einem vertrauenswürdigen Netz sinnvoll: Zugangsdaten und Cookies laufen unverschlüsselt. Windows legt eine Firewall-Regel für private/Domänen-Netze und das lokale Subnetz an; Linux bietet bei aktivem `ufw` optional eine Regel an. Für öffentliche Erreichbarkeit einen HTTPS-Proxy davorsetzen.
 - **Selbstsigniertes HTTPS (Test):** `deploy/setup-https-selfsigned.sh` richtet Nginx mit Testzertifikat, HTTP→HTTPS-Umleitung und Proxy auf `127.0.0.1:1621` ein.
-- **Für den lokalen Betrieb ohne Docker:** Node.js ab 22.13 – ältere Versionen laden die Anwendung nicht.
+- **Für den lokalen Betrieb ohne Docker:** Node.js ab 22.13 – ältere Versionen laden die Anwendung nicht. Unter Windows richtet `install-native.ps1` Node.js 22, die App und den Autostart als geplante Aufgabe ein; Docker, WSL und Git sind dafür nicht nötig.

@@ -19,7 +19,7 @@ Internes Projektwissen (Architektur, Entscheidungen, Datenmodell, Changelog) ste
 
 ## Automatische Installation
 
-Für Debian/Ubuntu (x86_64) und Windows (Docker Desktop, Windows 10 22H2+ oder Windows 11, x64) gibt es interaktive Fullscreen-Installer. Sie prüfen bzw. installieren Docker, klonen das Projekt, richten das Daten-Volume ein und begleiten Updates und Deinstallationen. Das erste Admin-Konto wird weiterhin im Browser unter `/setup` angelegt.
+Für Debian/Ubuntu (x86_64) und Windows (Windows 10 22H2+ oder Windows 11) gibt es interaktive Fullscreen-Installer. Linux und der klassische Windows-Installer nutzen Docker (x64); zusätzlich gibt es für Windows einen Bare-Metal-Installer ohne Docker (x64/ARM64). Alle begleiten Installation, Updates und Deinstallationen. Das erste Admin-Konto wird weiterhin im Browser unter `/setup` angelegt.
 
 **Linux** (Debian/Ubuntu, führt sich bei Bedarf per `sudo` neu aus):
 
@@ -37,7 +37,15 @@ irm https://raw.githubusercontent.com/Anigx/Grillabend-Anmeldung/main/bootstrap.
 
 Wichtig: Nicht `/install.ps1 | iex` verwenden – diese Datei ist der vollständige Installer mit UTF-8-BOM und wird vom Bootstrap als Datei gestartet. Der Windows-Installer richtet Docker Desktop per `winget` ein und aktiviert WSL2 ausschließlich als Docker-Backend (keine Ubuntu-Distribution). Standard ist die LAN-Freigabe auf `0.0.0.0:1621` mit Bestätigung und einer Firewall-Regel für private/Domänen-Netze; „nur lokal“ ist ebenfalls wählbar. Docker Desktop, WSL2 und Git werden bei einer Deinstallation nicht entfernt.
 
-Status und Logs liegen unter `/var/lib/grillabend-installer` bzw. `/var/log/grillabend-installer` (Linux) und `%ProgramData%\Grillabend-Installer` (Windows). Updates sichern die SQLite-Datenbank automatisch. Entfernen: `--uninstall` (App, Daten bleiben) oder `--purge` (inklusive Volume, Projekt und Backups); unter Windows `-Uninstall` bzw. `-Purge`. Details: [Installation](docs/handbuch/installation.md).
+**Windows ohne Docker (bare metal, Node.js + npm):**
+
+```powershell
+irm https://raw.githubusercontent.com/Anigx/Grillabend-Anmeldung/main/bootstrap-native.ps1 | iex
+```
+
+Der native Installer lädt Node.js 22 als offizielles, SHA-256-geprüftes ZIP und die App als GitHub-ZIP, führt `npm ci --omit=dev --ignore-scripts` aus und richtet eine geplante Aufgabe ein, die beim Systemstart als `SYSTEM` läuft. Docker, WSL und Git werden nicht benötigt. Standardziel ist `C:\Program Files\Grillabend`, die Daten liegen unter `%ProgramData%\Grillabend`, Port `1621`. Standard ist die LAN-Freigabe mit Bestätigung und Firewall-Regel; „nur lokal“ ist wählbar. Updates und Deinstallation laufen über dieselbe TUI oder `-Uninstall`/`-Purge`; `-SelfTest` prüft Download, npm und Start ohne Systemänderung.
+
+Status und Logs liegen unter `/var/lib/grillabend-installer` bzw. `/var/log/grillabend-installer` (Linux), `%ProgramData%\Grillabend-Installer` (Windows Docker) bzw. `%ProgramData%\Grillabend-Installer-Native` (Windows bare metal). Updates sichern die SQLite-Datenbank automatisch. Entfernen: `--uninstall` (App, Daten bleiben) oder `--purge` (inklusive Volume, Projekt und Backups); unter Windows `-Uninstall` bzw. `-Purge`. Details: [Installation](docs/handbuch/installation.md).
 
 ## Auf einen Blick
 
@@ -45,16 +53,18 @@ Status und Logs liegen unter `/var/lib/grillabend-installer` bzw. `/var/log/gril
 - **Selbstsigniertes HTTPS (Test):** `sudo bash deploy/setup-https-selfsigned.sh <host-oder-ip>` installiert Nginx, erzeugt ein selbstsigniertes Zertifikat und proxyt 443 auf `127.0.0.1:1621`. Später durch ein echtes Zertifikat ersetzbar.
 - **Lokal mit Node (Alternative):** Node.js ab 22.13, `npm ci --ignore-scripts` und `npm start`, danach <http://127.0.0.1:621> (SQLite kommt aus Node selbst, kein natives npm-Binding). Der Server bindet standardmäßig an `0.0.0.0` (per `HOST` änderbar) und ist damit auch über die Netzwerk-IP erreichbar.
 - **Windows mit Docker Desktop:** gleiche `compose.yaml`; Docker Desktop nutzt Portmapping statt Host-Netzwerk. Danach <http://127.0.0.1:1621> öffnen.
+- **Windows ohne Docker:** `bootstrap-native.ps1` richtet Node.js 22, `npm ci`, eine geplante Aufgabe unter `SYSTEM` und die Daten unter `%ProgramData%\Grillabend` ein. Kein Docker, WSL oder Git nötig.
 - **Sicherheit:** Die App spricht nur HTTP und hat keinen Origin-/CSRF-Check sowie keine `Secure`-Cookies. Sie darf nur über den vorgelagerten Proxy erreichbar sein (Standardbindung `127.0.0.1`).
 - **Erstes Admin-Konto:** Solange kein Admin existiert, leitet die Startseite auf `/setup` um; dort wird der Admin angelegt. Keine Admin-Umgebungsvariablen nötig.
-- **Passwort vergessen:** im Container `npm run reset-admin-password` (gibt ein neues Passwort aus).
-- **Showcase-Daten:** im Container `npm run seed-demo-users` erzeugt Demo-Konten mit echten Namen und Antworten (optional Anzahl, `--force`, `--cleanup`).
+- **Passwort vergessen:** im Container `npm run reset-admin-password` (gibt ein neues Passwort aus); bei Windows bare metal mit gesetztem `DATA_DIR` das Skript im App-Verzeichnis aufrufen (siehe [Betrieb](docs/handbuch/betrieb.md)).
+- **Showcase-Daten:** im Container `npm run seed-demo-users` erzeugt Demo-Konten mit echten Namen und Antworten (optional Anzahl, `--force`, `--cleanup`); bare metal analog mit gesetztem `DATA_DIR` (siehe [Betrieb](docs/handbuch/betrieb.md)).
 - **Tests:** `npm test` (ausschließlich temporäre, künstliche Datenbanken).
 - **Ein Abend gleichzeitig** mit offener Registrierung und serverseitigen Sessions.
 
 ## Projektstruktur
 
-- `install.sh`, `install.ps1`, `bootstrap.ps1` – interaktive Installer für Linux bzw. Windows sowie der kurze Windows-Einzeiler-Bootstrap.
+- `install.sh`, `install.ps1`, `bootstrap.ps1` – interaktive Installer für Linux bzw. Windows (Docker) sowie der kurze Windows-Einzeiler-Bootstrap.
+- `install-native.ps1`, `bootstrap-native.ps1` – interaktiver Windows-Bare-Metal-Installer (Node.js + npm, ohne Docker) und sein Einzeiler-Bootstrap.
 - `server.js` – kleiner Startpunkt; `src/server.js` – HTTP-Routen, Sitzungen und Kapazitätslogik.
 - `src/db.js`, `src/security.js`, `src/auth-limit.js` – SQLite-Initialisierung/Alt-Import, Passwort-/Token-Funktionen und Auth-Limits; `src/reset-password.js` – CLI zum Zurücksetzen des Admin-Passworts; `src/seed-demo-users.js` – CLI für Showcase-Daten.
 - `public/` – `index.html`/`js/app.js` (Anmeldung und Teilnahme), `setup.html`/`js/setup.js` (Ersteinrichtung), `admin.html`/`js/admin.js` (Adminoberfläche), `css/`.

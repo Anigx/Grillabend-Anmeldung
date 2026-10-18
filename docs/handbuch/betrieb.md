@@ -21,18 +21,20 @@ Sitzungen laufen nach sieben Tagen ab; abgelaufene Einträge werden beim Start u
 
 ## Automatischer Installer
 
-`install.sh` (Debian/Ubuntu) und `install.ps1` (Windows/Docker Desktop) sind interaktive Fullscreen-Installer; unter Windows startet der kurze Einzeiler über `bootstrap.ps1`. Sie prüfen bzw. installieren Docker, klonen das Projekt, ziehen das GHCR-Image, richten das Volume ein, bieten den Import einer vorhandenen `data/app.sqlite` an und unterstützen Update, Backup, Deinstallation und Autostart.
+`install.sh` (Debian/Ubuntu), `install.ps1` (Windows/Docker Desktop) und `install-native.ps1` (Windows ohne Docker) sind interaktive Fullscreen-Installer; unter Windows starten die kurzen Einzeiler über `bootstrap.ps1` bzw. `bootstrap-native.ps1`. Sie prüfen bzw. installieren die Laufzeitumgebung, richten die App ein und unterstützen Update, Backup, Deinstallation und Autostart.
 
 | Betriebssystem | Status/Logs | Entfernen |
 | --- | --- | --- |
 | Linux | `/var/lib/grillabend-installer/state`, `/var/log/grillabend-installer/` | `bash install.sh --uninstall` bzw. `--purge` |
-| Windows | `%ProgramData%\Grillabend-Installer\state.json`, `...\Logs\` | `powershell -NoProfile -ExecutionPolicy Bypass -File "$env:LOCALAPPDATA\Grillabend-Installer\install.ps1" -Uninstall` bzw. `-Purge`; alternativ die TUI |
+| Windows (Docker) | `%ProgramData%\Grillabend-Installer\state.json`, `...\Logs\` | `powershell -NoProfile -ExecutionPolicy Bypass -File "$env:LOCALAPPDATA\Grillabend-Installer\install.ps1" -Uninstall` bzw. `-Purge`; alternativ die TUI |
+| Windows (bare metal) | `%ProgramData%\Grillabend-Installer-Native\state.json`, `...\Logs\`, App-Log `%ProgramData%\Grillabend\app.log` | `install-native.ps1 -Uninstall` bzw. `-Purge`; alternativ die TUI |
 
 - **Linux:** Standardziel `/opt/grillabend`, Standardbindung nur lokal (`127.0.0.1:1621`). Docker wird bei Bedarf aus dem offiziellen Repository installiert. Nginx/HTTPS werden nicht eingerichtet; der spätere Proxy zeigt auf `127.0.0.1:1621`.
-- **Windows:** Standardziel `%USERPROFILE%\Grillabend-Anmeldung`, Standardbindung LAN (`0.0.0.0:1621`) nach Bestätigung; Firewall-Regel nur für private/Domänen-Netze und das lokale Subnetz. Docker Desktop wird per `winget` installiert; WSL2 dient nur als Backend, ohne Ubuntu-Distribution.
+- **Windows (Docker):** Standardziel `%USERPROFILE%\Grillabend-Anmeldung`, Standardbindung LAN (`0.0.0.0:1621`) nach Bestätigung; Firewall-Regel nur für private/Domänen-Netze und das lokale Subnetz. Docker Desktop wird per `winget` installiert; WSL2 dient nur als Backend, ohne Ubuntu-Distribution.
+- **Windows (bare metal):** Standardziel `C:\Program Files\Grillabend` mit `app\` und `node\`, Daten unter `%ProgramData%\Grillabend`, App-Log `%ProgramData%\Grillabend\app.log`. Node.js 22 und die App werden als ZIP geladen; es gibt keine Docker-, WSL- oder Git-Abhängigkeit. Die App läuft als geplante Aufgabe `Grillabend-Anmeldung` unter `SYSTEM` und startet beim Systemstart. Standardbindung ist LAN (`0.0.0.0:1621`) nach Bestätigung mit Firewall-Regel; „nur lokal“ ist wählbar. Updates sichern die SQLite-Datenbank nach `%ProgramData%\Grillabend\backups\` (die letzten fünf bleiben erhalten).
 - **Sicherheit:** Die App spricht nur HTTP und hat keinen Origin-/CSRF-Check. Die LAN-Freigabe ist nur in vertrauenswürdigen Netzen sinnvoll; für öffentliche Erreichbarkeit muss ein HTTPS-Proxy davorsitzen.
 - **Updates:** Vor dem Update wird die SQLite-Datenbank automatisch gesichert (die letzten fünf Backups bleiben in `backups/`). Bei einem Fehler versucht der Installer, die App mit dem vorhandenen Stand neu zu starten.
-- **Deinstallation:** `--uninstall`/`-Uninstall` entfernt Container und Image, behält Projektordner, Volume und Backups. `--purge`/`-Purge` entfernt zusätzlich Volume, Projektordner und Backups. Docker Desktop, WSL2 und Git werden nicht entfernt.
+- **Deinstallation:** `--uninstall`/`-Uninstall` entfernt Container und Image, behält Projektordner, Volume und Backups. `--purge`/`-Purge` entfernt zusätzlich Volume, Projektordner und Backups. Docker Desktop, WSL2 und Git werden nicht entfernt. Bei der Bare-Metal-Variante entfernt `-Uninstall` App, Node.js und die geplante Aufgabe, behält aber Daten und Backups; `-Purge` entfernt zusätzlich `%ProgramData%\Grillabend`.
 
 ## Admin-Passwort zurücksetzen
 
@@ -46,6 +48,11 @@ docker exec -it <container> npm run reset-admin-password
 - Bei mehreren Admin-Konten einen Namen ergänzen: `npm run reset-admin-password -- <benutzername>`.
 - Funktioniert auch im laufenden Betrieb; die Ausgabe erscheint in der Konsole.
 - Das neue Passwort nur an berechtigte Personen weitergeben.
+- **Bare-Metal-Windows:** Datenverzeichnis setzen und das Skript mit dem installierten Node.js aufrufen:
+  ```powershell
+  $env:DATA_DIR = "$env:ProgramData\Grillabend"
+  & "$env:ProgramFiles\Grillabend\node\node.exe" "$env:ProgramFiles\Grillabend\app\src\reset-password.js"
+  ```
 
 
 ## Showcase-Daten erzeugen
@@ -62,11 +69,16 @@ docker exec -it <container> npm run seed-demo-users -- 30
 - Standardmäßig bricht der Lauf bei bereits vorhandenen Konten ab; `--force` hängt die Demo-Konten trotzdem an.
 - `npm run seed-demo-users -- --cleanup` entfernt die zuvor erzeugten Demo-Konten samt Antworten wieder; echte Konten und Admins bleiben unberührt.
 - Die Namen sind frei erfunden und gehören zu keinen realen Personen.
+- **Bare-Metal-Windows:** Datenverzeichnis setzen und das Skript mit dem installierten Node.js aufrufen:
+  ```powershell
+  $env:DATA_DIR = "$env:ProgramData\Grillabend"
+  & "$env:ProgramFiles\Grillabend\node\node.exe" "$env:ProgramFiles\Grillabend\app\src\seed-demo-users.js" 30 --force
+  ```
 
 
 ## HTTP intern, TLS am Reverse Proxy
 
-Die App spricht ausschließlich HTTP. Im Container lauscht Node auf `0.0.0.0:80`; Docker veröffentlicht `127.0.0.1:1621`. Ein lokaler Reverse Proxy terminiert TLS auf 443 und leitet an `127.0.0.1:1621` weiter.
+Die App spricht ausschließlich HTTP. Im Container lauscht Node auf `0.0.0.0:80`; Docker veröffentlicht `127.0.0.1:1621`. Ein lokaler Reverse Proxy terminiert TLS auf 443 und leitet an `127.0.0.1:1621` weiter. Bei der Bare-Metal-Variante bindet die App direkt an `127.0.0.1:1621` oder – nach Freigabe – `0.0.0.0:1621`; ein Reverse Proxy kann genauso auf `127.0.0.1:1621` zeigen.
 
 - Es gibt **keine** HTTPS-Erzwingung (`426`), **keine** `Secure`-Cookies und **keinen** Origin-/CSRF-Check mehr. `SameSite=Lax` bleibt als einzige CSRF-Bremse.
 - Der Proxy setzt `X-Forwarded-For`; die App vertraut Loopback- und privaten Docker-Adressen, damit die Login-Limits pro echter Client-IP gelten.

@@ -42,6 +42,23 @@ irm https://raw.githubusercontent.com/Anigx/Grillabend-Anmeldung/main/bootstrap.
 - Docker Desktop ist für Privatanwender, Bildung und kleine Unternehmen kostenlos; für größere Unternehmen gelten die Lizenzbedingungen von Docker. Der Installer zeigt vor der Installation einen entsprechenden Hinweis.
 - Weitere Optionen des heruntergeladenen Installers: `-Help` (u. a. `-InstallDir`, `-Bind local|lan`, `-Yes`, `-NoPause`). Die TUI führt durch die normalen Fragen.
 
+### Windows ohne Docker (bare metal, Node.js + npm)
+
+Diese Variante braucht weder Docker noch WSL oder Git. Sie lädt Node.js 22 als offizielles ZIP, prüft die SHA-256-Prüfsumme und installiert die App mit `npm ci --omit=dev --ignore-scripts`.
+
+```powershell
+irm https://raw.githubusercontent.com/Anigx/Grillabend-Anmeldung/main/bootstrap-native.ps1 | iex
+```
+
+- Unterstützt Windows 10 22H2+ und Windows 11 auf x64 oder ARM64. Der Installer startet sich für Systemänderungen per UAC neu.
+- Standardziel ist `C:\Program Files\Grillabend` (App unter `app\`, Node.js unter `node\`); die Daten liegen unter `%ProgramData%\Grillabend`.
+- Die App läuft als geplante Aufgabe `Grillabend-Anmeldung` unter `SYSTEM` und startet beim Systemstart. Das App-Log steht unter `%ProgramData%\Grillabend\app.log`, die Installer-Logs unter `%ProgramData%\Grillabend-Installer-Native\Logs\`.
+- Standard ist die LAN-Freigabe auf `0.0.0.0:1621` nach Bestätigung mit einer Firewall-Regel für private/Domänen-Netze und das lokale Subnetz; „nur lokal“ (`127.0.0.1:1621`) ist wählbar.
+- Updates und Deinstallation über dieselbe TUI. Direkt: `.\install-native.ps1 -Uninstall` (Daten bleiben) bzw. `-Purge` (inklusive Node.js, Daten und Backups). `-SelfTest` prüft Download, npm und Start in einem temporären Verzeichnis, ohne Task oder Firewall-Regel anzulegen.
+- Ein vorhandener Datenbestand kann vor der Installation nach `%ProgramData%\Grillabend\app.sqlite` kopiert werden. Die App verwendet diese Datei beim Start.
+- Nicht parallel zur Docker-Variante auf demselben Port betreiben; der Installer bricht bei belegtem Port mit einer Meldung ab.
+- Weitere Optionen: `-InstallDir PFAD`, `-Bind local|lan`, `-Port NUMMER`, `-Yes`, `-NoPause`, `-Help`, `-Version`.
+
 ## Installation mit Docker (manuell)
 
 Im Projektordner:
