@@ -15,7 +15,7 @@
 ## Sichtbarkeit
 
 - **Die Registrierung ist offen.** Jede Person mit neuem Konto kann die Veranstaltungs- und Teilnahmeangaben sehen. Das ist beabsichtigt, aber ein bewusster Risikopunkt.
-- **Namensanzeige ist freiwillig.** Ist sie aus, erscheint „Anonym“ in der Mitgliederliste; Admins sehen den echten Namen weiterhin. Die Einstellung betrifft nur den Namen, nicht die übrigen Antwortdaten.
+- **Die Teilnehmerliste zeigt echte Namen.** Eine anonyme Namensanzeige gibt es nicht mehr; der frühere Schalter und die zugehörige API wurden entfernt. Admins sehen dieselben Namen in der Adminübersicht.
 
 ## Daten und Sicherung
 

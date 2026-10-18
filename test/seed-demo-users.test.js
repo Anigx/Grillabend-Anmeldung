@@ -58,12 +58,11 @@ test('seed-demo-users erzeugt standardmäßig so viele Konten wie die Hütten-Ka
         assert.ok(match, `Ausgabe ohne Passwort: ${stdout}`);
         const password = match[1];
 
-        const users = query(root, 'SELECT id, username, password_hash, is_admin, show_name FROM users');
+        const users = query(root, 'SELECT id, username, password_hash, is_admin FROM users');
         assert.equal(users.length, 5);
         const seen = new Set();
         for (const user of users) {
             assert.equal(user.is_admin, 0);
-            assert.equal(user.show_name, 1);
             assert.match(user.username, /^[\p{L}\p{N} _.-]{2,40}$/u);
             assert.ok(user.username.includes(' '), `Kein Vor-/Nachname: ${user.username}`);
             assert.ok(!seen.has(user.username.toLowerCase()));
@@ -126,7 +125,7 @@ test('seed-demo-users bricht bei vorhandenen Konten ab und hängt nur mit --forc
 
 test('seed-demo-users --cleanup entfernt nur die erzeugten Konten und deren Antworten', async () => {
     const root = await createDatabase(async db => {
-        await db.run("INSERT INTO users (username, password_hash, is_admin, show_name) VALUES ('Organisator', 'synthetischer-Hash', 1, 1)");
+        await db.run("INSERT INTO users (username, password_hash, is_admin) VALUES ('Organisator', 'synthetischer-Hash', 1)");
     });
     try {
         assert.equal((await runSeed(root, ['4', '--force'])).code, 0);

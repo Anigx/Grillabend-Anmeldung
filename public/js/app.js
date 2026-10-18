@@ -94,14 +94,11 @@ document.addEventListener('DOMContentLoaded', () => {
         document.title = user ? 'Grillabend – Deine Rückmeldung' : 'Grillabend – Anmeldung';
         if (!user) {
             el('deleteModal').classList.add('hidden');
-            el('showName').checked = false;
-            message('visibilityMessage', '');
             if (el('settingsDialog').open) el('settingsDialog').close();
             return;
         }
         el('loggedInUser').textContent = user.username;
         el('adminBtn').classList.toggle('hidden', !user.is_admin);
-        el('showName').checked = user.show_name;
     }
 
     function showParty() {
@@ -252,7 +249,7 @@ document.addEventListener('DOMContentLoaded', () => {
     el('settingsToggle').addEventListener('click', () => {
         if (!user) return;
         el('newUsername').value = user.username;
-        for (const id of ['visibilityMessage', 'usernameMessage', 'passwordMessage']) message(id, '');
+        for (const id of ['usernameMessage', 'passwordMessage']) message(id, '');
         settingsDialog.showModal();
         el('settingsToggle').setAttribute('aria-expanded', 'true');
     });
@@ -269,25 +266,6 @@ document.addEventListener('DOMContentLoaded', () => {
         el('passwordForm').reset();
         el('repeatSettingsPassword').setCustomValidity('');
         if (user) el('settingsToggle').focus();
-    });
-    el('showName').addEventListener('change', async () => {
-        const checkbox = el('showName');
-        const currentUser = user;
-        const showName = checkbox.checked;
-        checkbox.disabled = true;
-        try {
-            const saved = await api('profile/visibility', { method: 'PUT', body: { show_name: showName } });
-            if (user !== currentUser) return;
-            user.show_name = saved.show_name;
-            attendees = await api('attendees');
-            showAttendees(false);
-            message('visibilityMessage', 'Namensanzeige gespeichert.', 'success');
-        } catch (error) {
-            if (user === currentUser) {
-                checkbox.checked = user.show_name;
-                message('visibilityMessage', error.message);
-            }
-        } finally { checkbox.disabled = false; }
     });
     el('usernameForm').addEventListener('submit', async event => {
         event.preventDefault();

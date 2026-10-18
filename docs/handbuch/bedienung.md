@@ -15,7 +15,6 @@ Unter „Wer ist schon dabei?“ stehen Zusagen, „Vielleicht“, belegte Schla
 
 ### Einstellungen (Zahnrad links neben dem Namen)
 
-- **Namensanzeige:** Schiebeschalter, ob dein Name in der Teilnehmerliste erscheint; ohne Häkchen steht „Anonym“. Admins sehen deinen Namen weiterhin.
 - **Benutzernamen ändern** und **Passwort ändern** (jeweils mit aktuellem Passwort). Nach einem Passwortwechsel werden andere Sitzungen beendet.
 - Auch Admin-Konten sind normale Konten und können Name und Passwort hier ändern.
 

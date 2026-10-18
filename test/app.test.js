@@ -82,11 +82,10 @@ test('öffentliche Registrierung erstellt nur Mitglieder, Daten bleiben privat u
         const created = await app.request('/api/register', 'POST', { username: 'Testperson', password: 'ein-lang-genuges-Testpasswort1' });
         assert.equal(created.status, 200);
         assert.equal(created.data.is_admin, false);
-        assert.equal(created.data.show_name, true);
+        assert.equal(Object.hasOwn(created.data, 'show_name'), false);
         assert.match(created.cookie, /^sid=[a-f0-9]{64}$/);
         const stored = await app.db.get('SELECT password_hash FROM users WHERE username = ?', ['Testperson']);
         assert.match(stored.password_hash, /^scrypt:/);
-        assert.equal((await app.db.get('SELECT show_name FROM users WHERE username = ?', ['Testperson'])).show_name, 1);
         assert.equal((await app.request('/api/admin/party-info', 'PUT', {}, created.cookie)).status, 403);
         assert.equal((await app.request('/api/admin/party-info', 'GET', null, created.cookie)).status, 403);
         assert.equal((await fetch(`${app.base}/admin`, { headers: { Cookie: created.cookie } })).status, 403);
@@ -101,44 +100,28 @@ test('öffentliche Registrierung erstellt nur Mitglieder, Daten bleiben privat u
     } finally { await app.close(); }
 });
 
-test('Namensanzeige ist freiwillig, Änderungen wirken nur für das eigene Konto und Antworten bleiben bestehen', async () => {
+test('Namensanzeige-Schalter und Sichtbarkeits-API sind entfernt; die Teilnehmerliste zeigt immer echte Namen', async () => {
     const app = await instance();
     try {
-        const admin = await createAdmin(app, 'Organisator', 'Sicheres-Beispielpasswort1!');
         const alice = await app.request('/api/register', 'POST', { username: 'Alice', password: 'ein-lang-genuges-Testpasswort1' });
         const bob = await app.request('/api/register', 'POST', { username: 'Bob', password: 'ein-lang-genuges-Testpasswort1' });
-        assert.equal((await app.request('/api/session', 'GET', null, alice.cookie)).data.show_name, true);
         const answer = { kommt: 'Ja', huette: 'Nein', luftmatratze: 'Nein', bettzeug: 'Nein' };
         assert.equal((await app.request('/api/rsvp', 'POST', answer, alice.cookie)).status, 200);
         assert.equal((await app.request('/api/rsvp', 'POST', answer, bob.cookie)).status, 200);
-        const initial = await app.request('/api/attendees', 'GET', null, bob.cookie);
-        assert.equal(initial.cacheControl, 'no-store');
-        assert.deepEqual(initial.data.map(row => row.username), ['Bob', 'Alice']);
-        assert.deepEqual(initial.data.map(row => row.is_self), [1, 0]);
-        assert.ok(initial.data.every(row => !Object.hasOwn(row, 'updated_at')));
-        assert.deepEqual((await app.request('/api/attendees', 'GET', null, alice.cookie)).data.map(row => row.is_self), [0, 1]);
 
-        assert.equal((await app.request('/api/profile/visibility', 'PUT', { show_name: true })).status, 401);
-        for (const body of [{}, { show_name: 1 }, { show_name: 'true' }]) {
-            assert.equal((await app.request('/api/profile/visibility', 'PUT', body, alice.cookie)).status, 400);
+        for (const response of [
+            await app.request('/api/session', 'GET', null, alice.cookie),
+            await app.request('/api/login', 'POST', { username: 'Alice', password: 'ein-lang-genuges-Testpasswort1' })
+        ]) {
+            assert.equal(Object.hasOwn(response.data, 'show_name'), false);
         }
-        assert.deepEqual((await app.request('/api/profile/visibility', 'PUT', { show_name: false }, alice.cookie)).data, { show_name: false });
-        assert.equal((await app.request('/api/session', 'GET', null, alice.cookie)).data.show_name, false);
-        assert.deepEqual((await app.request('/api/attendees', 'GET', null, bob.cookie)).data.map(row => row.username), ['Bob', 'Anonym']);
-        assert.deepEqual((await app.request('/api/profile/visibility', 'PUT', { show_name: false }, bob.cookie)).data, { show_name: false });
-        assert.deepEqual((await app.request('/api/attendees', 'GET', null, bob.cookie)).data.map(row => row.username), ['Anonym', 'Anonym']);
-        const changed = await app.request('/api/profile/visibility', 'PUT', { show_name: true, user_id: 999 }, alice.cookie);
-        assert.deepEqual(changed.data, { show_name: true });
-        assert.equal((await app.request('/api/session', 'GET', null, alice.cookie)).data.show_name, true);
-        assert.equal((await app.request('/api/login', 'POST', { username: 'Alice', password: 'ein-lang-genuges-Testpasswort1' })).data.show_name, true);
-        assert.equal((await app.db.get('SELECT show_name FROM users WHERE username = ?', ['Alice'])).show_name, 1);
-        assert.equal((await app.db.get('SELECT show_name FROM users WHERE username = ?', ['Bob'])).show_name, 0);
-        assert.deepEqual((await app.request('/api/attendees', 'GET', null, bob.cookie)).data.map(row => row.username), ['Anonym', 'Alice']);
-        assert.equal((await app.request('/api/admin/users', 'GET', null, admin.cookie)).data.some(row => row.username === 'Bob'), true);
+        assert.equal((await app.request('/api/profile/visibility', 'PUT', { show_name: false }, alice.cookie)).status, 404);
+        assert.deepEqual((await app.request('/api/attendees', 'GET', null, bob.cookie)).data.map(row => row.username), ['Bob', 'Alice']);
 
-        assert.deepEqual((await app.request('/api/profile/visibility', 'PUT', { show_name: false }, alice.cookie)).data, { show_name: false });
-        assert.deepEqual((await app.request('/api/attendees', 'GET', null, bob.cookie)).data.map(row => row.username), ['Anonym', 'Anonym']);
-        assert.equal((await app.db.get('SELECT COUNT(*) AS count FROM rsvps')).count, 2);
+        const html = await (await fetch(app.base)).text();
+        assert.doesNotMatch(html, /id="showName"/);
+        assert.doesNotMatch(html, /Namensanzeige/);
+        assert.doesNotMatch(html, /visibility-switch/);
     } finally { await app.close(); }
 });
 
@@ -707,8 +690,9 @@ test('bestehende Datenbank erhält Koordinatenspalten ohne Verlust der Ortsdaten
             assert.equal(party.maps_url, 'https://maps.google.com/');
             assert.equal(party.latitude, null);
             assert.equal(party.longitude, null);
-            const existing = await db.get('SELECT username, show_name FROM users WHERE username = ?', ['Bestandskonto']);
-            assert.deepEqual(existing, { username: 'Bestandskonto', show_name: 1 });
+            const existing = await db.get('SELECT username FROM users WHERE username = ?', ['Bestandskonto']);
+            assert.deepEqual(existing, { username: 'Bestandskonto' });
+            assert.equal((await db.all('PRAGMA table_info(users)')).some(column => column.name === 'show_name'), false);
             const columns = await db.all('PRAGMA table_info(party_info)');
             assert.equal(columns.filter(row => ['latitude', 'longitude'].includes(row.name)).length, 2);
         } finally { await db.close(); }
@@ -740,31 +724,25 @@ test('bestehende Bettgarnitur-Spalte wird beim Start auf Luftmatratze und Bettze
     } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
 
-test('einmalige Namensmigration aktiviert bestehende Konten und überschreibt späteres Ausschalten nicht', async () => {
+test('Alt-Spalte show_name wird ignoriert; die Teilnehmerliste zeigt trotzdem echte Namen', async () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'grillabend-sichtbarkeit-'));
     const dataDir = path.join(root, 'data');
     fs.mkdirSync(dataDir);
     try {
         await createLegacy(path.join(dataDir, 'app.sqlite'), `CREATE TABLE users (
             id INTEGER PRIMARY KEY, username TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL,
-            is_admin INTEGER NOT NULL DEFAULT 0, show_name INTEGER NOT NULL DEFAULT 0);
-            INSERT INTO users (username, password_hash, show_name) VALUES ('Bestandskonto', 'synthetischer-Althash', 0);`);
-        const first = await createApp({ dataDir, legacyDir: root });
+            is_admin INTEGER NOT NULL DEFAULT 0, show_name INTEGER NOT NULL DEFAULT 0);`);
+        const app = await instance(root, { dataDir });
         try {
-            assert.equal((await first.db.get('SELECT show_name FROM users WHERE username = ?', ['Bestandskonto'])).show_name, 1);
-            assert.ok(await first.db.get('SELECT value FROM metadata WHERE key = ?', ['names_visible_once']));
-            await first.db.run('UPDATE users SET show_name = 0 WHERE username = ?', ['Bestandskonto']);
-        } finally { await first.db.close(); }
-        const seeded = new DatabaseSync(path.join(dataDir, 'app.sqlite'));
-        try {
-            seeded.prepare("INSERT INTO users (username, password_hash, is_admin, show_name) VALUES ('NeuerAdmin', 'synthetischer-Althash', 1, 1)").run();
-        } finally { seeded.close(); }
-        let restarted;
-        restarted = await createApp({ dataDir, legacyDir: root });
-        try {
-            assert.equal((await restarted.db.get('SELECT show_name FROM users WHERE username = ?', ['Bestandskonto'])).show_name, 0);
-            assert.equal((await restarted.db.get('SELECT show_name FROM users WHERE username = ?', ['NeuerAdmin'])).show_name, 1);
-        } finally { await restarted.db.close(); }
+            const alice = await app.request('/api/register', 'POST', { username: 'Alice', password: 'ein-lang-genuges-Testpasswort1' });
+            const bob = await app.request('/api/register', 'POST', { username: 'Bob', password: 'ein-lang-genuges-Testpasswort1' });
+            await app.db.run('UPDATE users SET show_name = 0');
+            const answer = { kommt: 'Ja', huette: 'Nein', luftmatratze: 'Nein', bettzeug: 'Nein' };
+            assert.equal((await app.request('/api/rsvp', 'POST', answer, alice.cookie)).status, 200);
+            assert.equal((await app.request('/api/rsvp', 'POST', answer, bob.cookie)).status, 200);
+            assert.deepEqual((await app.request('/api/attendees', 'GET', null, bob.cookie)).data.map(row => row.username), ['Bob', 'Alice']);
+            assert.equal(await app.db.get('SELECT value FROM metadata WHERE key = ?', ['names_visible_once']), undefined);
+        } finally { await app.close(); }
     } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
 
@@ -940,7 +918,7 @@ test('reset-admin-password scheitert ohne Admin und verlangt bei mehreren Admins
         assert.equal(empty.code, 1);
         assert.match(empty.stderr, /Kein Admin-Konto/);
         await createAdmin(app, 'Erster', 'Sicheres-Beispielpasswort1!');
-        await app.db.run("INSERT INTO users (username, password_hash, is_admin, show_name) VALUES ('Zweiter', 'synthetischer-Althash', 1, 1)");
+        await app.db.run("INSERT INTO users (username, password_hash, is_admin) VALUES ('Zweiter', 'synthetischer-Althash', 1)");
         const ambiguous = await runResetCli(app.root);
         assert.equal(ambiguous.code, 1);
         assert.match(ambiguous.stderr, /Mehrere Admin-Konten/);

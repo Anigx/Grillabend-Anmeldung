@@ -76,7 +76,7 @@ async function importLegacy(db, legacyDir) {
             if (typeof user.password !== 'string' || !user.password.length) {
                 throw new Error('Alt-Konto ohne gültiges Passwort; Übernahme abgebrochen.');
             }
-            await db.run('INSERT INTO users (username, password_hash, is_admin, show_name) VALUES (?, ?, ?, 1)', [
+            await db.run('INSERT INTO users (username, password_hash, is_admin) VALUES (?, ?, ?)', [
                 user.username, await hashPassword(user.password), user.is_admin === 1 ? 1 : 0
             ]);
         }
@@ -171,7 +171,7 @@ async function openDatabase({ dataDir, legacyDir }) {
             PRAGMA foreign_keys = ON;
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY, username TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL,
-                is_admin INTEGER NOT NULL DEFAULT 0, show_name INTEGER NOT NULL DEFAULT 1 CHECK (show_name IN (0, 1))
+                is_admin INTEGER NOT NULL DEFAULT 0
             );
             CREATE TABLE IF NOT EXISTS sessions (
                 token_hash TEXT PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, expires_at INTEGER NOT NULL
@@ -193,11 +193,6 @@ async function openDatabase({ dataDir, legacyDir }) {
             );
             CREATE TABLE IF NOT EXISTS metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL);
         `);
-        // Newly installed databases and legacy schemas start with visible names.
-        const userColumns = await db.all('PRAGMA table_info(users)');
-        if (!userColumns.some(column => column.name === 'show_name')) {
-            await db.run('ALTER TABLE users ADD COLUMN show_name INTEGER NOT NULL DEFAULT 1 CHECK (show_name IN (0, 1))');
-        }
         // Existing installations have party_info without coordinates; keep their event data intact.
         const columns = await db.all('PRAGMA table_info(party_info)');
         for (const name of ['latitude', 'longitude']) {
@@ -207,19 +202,6 @@ async function openDatabase({ dataDir, legacyDir }) {
         await migrateBeddingColumns(db);
         await importLegacy(db, legacyDir);
         await db.run('INSERT OR IGNORE INTO party_info (id) VALUES (1)');
-        // Apply the requested change to existing accounts once; later opt-outs must survive restarts.
-        const visibilityMigrated = await db.get('SELECT value FROM metadata WHERE key = ?', ['names_visible_once']);
-        if (!visibilityMigrated) {
-            await db.exec('BEGIN IMMEDIATE');
-            try {
-                await db.run('UPDATE users SET show_name = 1 WHERE show_name != 1');
-                await db.run('INSERT INTO metadata (key, value) VALUES (?, ?)', ['names_visible_once', new Date().toISOString()]);
-                await db.exec('COMMIT');
-            } catch (error) {
-                await db.exec('ROLLBACK');
-                throw error;
-            }
-        }
         await db.run('DELETE FROM sessions WHERE expires_at <= ?', [Date.now()]);
         await db.run(`DELETE FROM sessions WHERE rowid IN (
             SELECT rowid FROM (

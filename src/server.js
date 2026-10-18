@@ -61,7 +61,7 @@ async function createApp(options = {}) {
     async function session(req) {
         const token = sessionToken(req);
         if (!token) return null;
-        return db.get(`SELECT users.id, users.username, users.is_admin, users.show_name FROM sessions
+        return db.get(`SELECT users.id, users.username, users.is_admin FROM sessions
             JOIN users ON users.id = sessions.user_id WHERE sessions.token_hash = ? AND sessions.expires_at > ?`, [tokenHash(token), Date.now()]);
     }
 
@@ -88,7 +88,7 @@ async function createApp(options = {}) {
 
     async function issueSession(res, user, upgradedHash = null) {
         const issued = await exclusive(async () => {
-            const current = await db.get('SELECT username, password_hash, is_admin, show_name FROM users WHERE id = ?', [user.id]);
+            const current = await db.get('SELECT username, password_hash, is_admin FROM users WHERE id = ?', [user.id]);
             // A login verified before a concurrent password change must not create a new session afterwards.
             if (!current || (user.password_hash && current.password_hash !== user.password_hash)) return null;
             if (upgradedHash) {
@@ -105,7 +105,7 @@ async function createApp(options = {}) {
         });
         if (!issued) return res.status(401).json({ error: 'Name oder Passwort falsch.' });
         cookie(res, issued.token, SESSION_AGE / 1000);
-        res.json({ username: issued.user.username, is_admin: issued.user.is_admin === 1, show_name: issued.user.show_name === 1 });
+        res.json({ username: issued.user.username, is_admin: issued.user.is_admin === 1 });
     }
 
     const authLimit = createAuthLimit();
@@ -120,8 +120,8 @@ async function createApp(options = {}) {
             const name = username.trim();
             const passwordHash = await hashPassword(password);
             // The first admin may only be created while none exists; one write decides atomically.
-            const result = await exclusive(() => db.run(`INSERT INTO users (username, password_hash, is_admin, show_name)
-                SELECT ?, ?, 1, 1 WHERE NOT EXISTS (SELECT 1 FROM users WHERE is_admin = 1)`, [name, passwordHash]));
+            const result = await exclusive(() => db.run(`INSERT INTO users (username, password_hash, is_admin)
+                SELECT ?, ?, 1 WHERE NOT EXISTS (SELECT 1 FROM users WHERE is_admin = 1)`, [name, passwordHash]));
             if (!result.changes) return res.status(409).json({ error: 'Es existiert bereits ein Admin-Konto.' });
             res.json({ success: true, username: name });
         } catch (error) {
@@ -140,8 +140,8 @@ async function createApp(options = {}) {
             const name = username.trim();
             const passwordHash = await hashPassword(password);
             // A single SQLite write checks case-insensitive uniqueness atomically, including parallel registrations.
-            const result = await exclusive(() => db.run(`INSERT INTO users (username, password_hash, is_admin, show_name)
-                SELECT ?, ?, 0, 1 WHERE NOT EXISTS (SELECT 1 FROM users WHERE username = ? COLLATE NOCASE)`, [name, passwordHash, name]));
+            const result = await exclusive(() => db.run(`INSERT INTO users (username, password_hash, is_admin)
+                SELECT ?, ?, 0 WHERE NOT EXISTS (SELECT 1 FROM users WHERE username = ? COLLATE NOCASE)`, [name, passwordHash, name]));
             if (!result.changes) return res.status(409).json({ error: 'Dieser Name ist bereits vergeben.' });
             await issueSession(res, { id: result.lastID, password_hash: passwordHash });
         } catch (error) {
@@ -168,8 +168,8 @@ async function createApp(options = {}) {
     app.get('/api/session', async (req, res, next) => {
         try {
             const user = await session(req);
-            res.json(user ? { username: user.username, is_admin: user.is_admin === 1, show_name: user.show_name === 1 }
-                : { username: null, is_admin: false, show_name: false });
+            res.json(user ? { username: user.username, is_admin: user.is_admin === 1 }
+                : { username: null, is_admin: false });
         } catch (error) { next(error); }
     });
 
@@ -178,16 +178,6 @@ async function createApp(options = {}) {
             await exclusive(() => db.run('DELETE FROM sessions WHERE token_hash = ?', [tokenHash(sessionToken(req))]));
             cookie(res, '', 0);
             res.json({ success: true });
-        } catch (error) { next(error); }
-    });
-
-    app.put('/api/profile/visibility', requireUser, async (req, res, next) => {
-        try {
-            if (typeof req.body?.show_name !== 'boolean') {
-                return res.status(400).json({ error: 'Ungültige Einstellung zur Namensanzeige.' });
-            }
-            await exclusive(() => db.run('UPDATE users SET show_name = ? WHERE id = ?', [req.body.show_name ? 1 : 0, req.user.id]));
-            res.json({ show_name: req.body.show_name });
         } catch (error) { next(error); }
     });
 
@@ -274,7 +264,7 @@ async function createApp(options = {}) {
 
     app.get('/api/attendees', requireUser, async (req, res, next) => {
         try {
-            res.json(await db.all(`SELECT CASE WHEN users.show_name = 1 THEN users.username ELSE 'Anonym' END AS username,
+            res.json(await db.all(`SELECT users.username,
                 rsvps.kommt, rsvps.huette, rsvps.luftmatratze, rsvps.bettzeug,
                 CASE WHEN users.id = ? THEN 1 ELSE 0 END AS is_self FROM rsvps
                 JOIN users ON users.id = rsvps.user_id

@@ -236,7 +236,7 @@ async function seed(db, requested, force) {
     const plans = names.map(username => ({ username, rsvp: planRsvp(limits) }));
     const hashes = await Promise.all(plans.map(() => hashPassword(password)));
 
-    const insertUser = db.prepare('INSERT INTO users (username, password_hash, is_admin, show_name) VALUES (?, ?, 0, 1)');
+    const insertUser = db.prepare('INSERT INTO users (username, password_hash, is_admin) VALUES (?, ?, 0)');
     const insertRsvp = db.prepare(`INSERT INTO rsvps (user_id, kommt, huette, luftmatratze, bettzeug, updated_at)
         VALUES (?, ?, ?, ?, ?, ?)`);
     const tracked = [];
